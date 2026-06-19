@@ -1,7 +1,6 @@
 import sheet
 
 SHEET_FROM_ROW:int=5
-""" the first row that tasks should be filled in """
 SHEET_FROM_COLUMN:int=2
 SHEET_TO_COLUMN:int=13
 SHEET_DESCRIPTION_COLUMN:int=3
@@ -16,6 +15,9 @@ SHEET_ASSIGNED_USERS_COUNT:int=3
 
 SHEET_ELEMENT_COLUMN:int=2
 
+DEFAULT_STATUS="Not started"
+COMPLETE_STATUS="Complete"
+
 domains:dict={}
 
 cached_element_colors:dict={}
@@ -27,15 +29,24 @@ class SprintTask:
 	# what is this, a spoon convention?
 	description:str=""
 	discipline:str=""
-	status:str="Not started"
+	status:str=DEFAULT_STATUS
 	priority:str=""
 	date_completed:str=""
 	blockers:str=""
 	comments:str=""
-	assigned_users:list[str]=[]
+	assigned_users:list[str]
+
+	def __init__(self):
+		# grr
+		self.assigned_users=[]
 
 	def sort(self)->float:
 		score=0.0
+
+		# check for bad task
+		for property in [self.description,self.discipline,self.status,self.priority]:
+			if property=="":
+				return 999999.0
 
 		# more important for the sort in descending order
 		for pair in [("disciplines",self.discipline),("priorities",self.priority),("statuses",self.status)]:
@@ -146,21 +157,6 @@ def get_element_color(element:str):
 	# invalid element
 	return None
 
-# def organize_tasks():
-# 	# gather
-# 	relevant_cells="B%d:K"%ELEMENT_START_ROW
-# 	sheet=get_current_sheet()
-# 	tasks=batch_get_values(sheet,[relevant_cells])[0]
-
-# 	# sort
-# 	tasks.sort(key=sort_task)
-
-# 	batch_clear(sheet,[relevant_cells])
-# 	batch_update(sheet,[{
-# 		"values":tasks,
-# 		"range":relevant_cells
-# 	}])
-
 def get_current_worksheet()->sheet.gspread.worksheet:
 	return sheet.get_worksheet("current")
 
@@ -186,7 +182,7 @@ def from_list(task_list:list[str])->SprintTask:
 	task.discipline=task_list[SHEET_DISCIPLINE_COLUMN-SHEET_FROM_COLUMN]
 	task.status=task_list[SHEET_STATUS_COLUMN-SHEET_FROM_COLUMN]
 	task.priority=task_list[SHEET_PRIORITY_COLUMN-SHEET_FROM_COLUMN]
-	task.date_completed=task_list[SHEET_DESCRIPTION_COLUMN-SHEET_FROM_COLUMN]
+	task.date_completed=task_list[SHEET_DATE_COMPLETED_COLUMN-SHEET_FROM_COLUMN]
 	task.blockers=task_list[SHEET_BLOCKERS_COLUMN-SHEET_FROM_COLUMN]
 	task.comments=task_list[SHEET_COMMENTS_COLUMN-SHEET_FROM_COLUMN]
 
@@ -194,6 +190,11 @@ def from_list(task_list:list[str])->SprintTask:
 	assigned_user_start:int=SHEET_ASSIGNED_USERS_COLUMN-SHEET_FROM_COLUMN
 	for i in range(SHEET_ASSIGNED_USERS_COUNT):
 		assigned_user_index:int=assigned_user_start+i
+
+		# bounds check
+		if assigned_user_index>=len(task_list):
+			break
+
 		if task_list[assigned_user_index]!="":
 			# not empty, append
 			task.assigned_users.append(task_list[assigned_user_index])
@@ -217,9 +218,24 @@ def get_sheet_tasks()->list[SprintTask]:
 	returns a list of all tasks from the current spreadsheet
 	"""
 	sheet_tasks:list[SprintTask]=[]
-	for sheet_task_list in get_sheet_task_lists:
+	for sheet_task_list in get_sheet_task_lists(get_current_worksheet()):
 		sheet_tasks.append(from_list(sheet_task_list))
 	return sheet_tasks
+
+def organize_sheet()->None:
+	# collect and organize
+	tasks=get_sheet_tasks()
+	tasks.sort(key=SprintTask.sort)
+	
+	# to lists
+	task_lists=[]
+	for task in tasks:
+		task_lists.append(task.get_list())
+	
+	# update
+	worksheet=get_current_worksheet()
+	sheet.batch_clear_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
+	sheet.batch_update_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
 
 # collect domains
 for domain in ["disciplines","statuses","priorities","users"]:

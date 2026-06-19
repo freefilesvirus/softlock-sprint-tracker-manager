@@ -1,11 +1,13 @@
 import discord
 from discord.ext import commands
+from datetime import datetime
 import rapidfuzz
-import sheet
 import memory
 import tasks
 
 DEFAULT_COLOR=discord.Color.from_rgb(255,234,124)
+
+NUMBER_EMOJIS:list[str]=["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
 
 # accuracy percent to immediately accept above
 ACCEPTABLE_TASK_SIMILARITY=95
@@ -40,7 +42,7 @@ def get_element_discord_color(element:str)->discord.Color:
 		int((color.blue or 0)*255)
 	)
 
-def user_embed(discord_user:discord.user,action:str)->discord.Embed:
+def user_embed(discord_user:discord.user,action:str="")->discord.Embed:
 	"""
 	creates an embed colored after the user with a description of what they did
 
@@ -48,64 +50,357 @@ def user_embed(discord_user:discord.user,action:str)->discord.Embed:
 	e.g. "created a task" or "registered as user"
 	"""
 	embed:discord.Embed=discord.Embed(
-		description=f"{discord_user.mention} {action}",
 		color=get_element_discord_color(memory.get_sheet_user(discord_user.id))
 	)
 	# set user
 	embed.set_author(name=discord_user.display_name,icon_url=discord_user.display_avatar)
 
+	# set description if action not empty
+	if action!="":
+		embed.description=f"{discord_user.mention} {action}"
+
 	return embed
 
-# TODO
-#async def get_task_from_description(ctx:discord.context,description:str)->tasks.SprintTask:
-#	for task in tasks.get_sheet_tasks():
+async def fail(ctx,message:str)->None:
+	"""
+	creates an ephemeral message indicating the command failed
+	"""
+	await ctx.respond(
+		embed=discord.Embed(color=DEFAULT_COLOR,description=f"Operation failed! {message}"),
+		ephemeral=True
+	)
 
-# returns the task index of a close enough task, or has user choose
-# async def get_task_index(ctx,task):
-# 	tasks=sheet.get_all_tasks()
+async def fail_notask(ctx)->None:
+	await fail(ctx,"Couldn't find the task")
 
-# 	# make lower for comparison
-# 	task=task.lower()
-# 	for index in range(len(tasks)):
-# 		tasks[index]=tasks[index].lower()
+async def fail_notregistered(ctx,user:discord.user)->None:
+	await fail(ctx,f"{user.mention} is not registered")
 
-# 	matches=rapidfuzz.process.extract(task,tasks)
-# 	for match in matches:
-# 		if match[1]>=ACCEPTABLE_TASK_SIMILARITY:
-# 			# good enough, find its index
-# 			index=0
-# 			for t in tasks:
-# 				if match[0]==t:
-# 					return index
+async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
+	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks()
 
-# 				index+=1
+	description=description
+
+	# collect descriptions
+	descriptions:list[str]=[]
+	for task in sheet_tasks:
+		descriptions.append(task.description)
+
+	matches=rapidfuzz.process.extract(description,descriptions,processor=rapidfuzz.utils.default_process)
+	for match in matches:
+		if match[1]>=ACCEPTABLE_TASK_SIMILARITY:
+			# good enough, find which task the description is for again
+			for task in sheet_tasks:
+				if task.description==match[0]:
+					return task
+
+	# its gonna be a second
+	await ctx.defer()
 	
-# 	# show the user similar
-# 	embed=discord.Embed(
-# 		description="Invalid task! Did you mean one of the following?",
-# 		color=DEFAULT_COLOR
-# 	)
-# 	emojis=[]
-# 	for match in matches:
-# 		embed.add_field(name="",value="> "+match[0],inline=False)
+	# offer similar tasks
+	embed=user_embed(ctx.author)
+	embed.add_field(name="",value="Invalid task! Did you mean one of the following?",inline=False)
+	emojis:list[str]=[]
+	for i,match in enumerate(matches):
+		emoji:str=NUMBER_EMOJIS[i]
+		embed.add_field(name="",value=f"> {emoji} {match[0]}",inline=False)
 
-# 	message=await ctx.respond(embed=embed,ephemeral=True)
+		# add to list
+		emojis.append(emoji)
+	message=await ctx.send(embed=embed,silent=True)
 
-# 	return -1
+	# add reactions
+	for emoji in emojis:
+		await message.add_reaction(emoji)
+
+	# check if user has already added reaction
+	def reaction_check(reaction,user)->bool:
+		return user==ctx.author and reaction.emoji in emojis
+
+	# gotta go through this rigamarole to get correct reactions
+	winning_reaction:discord.reaction=None
+	message=await message.channel.fetch_message(message.id)
+	for reaction in message.reactions:
+		for user in await reaction.users().flatten():
+			if reaction_check(reaction,user):
+				winning_reaction=reaction
+				break
+		
+		if not winning_reaction is None:
+			break
+
+	# check if user hasnt reacted yet
+	if winning_reaction is None:
+		try:
+			winning_reaction,user=await bot.wait_for("reaction_add",check=reaction_check,timeout=10)
+		except discord.asyncio.TimeoutError as error:
+			# timeout
+			await message.delete()
+			return None
+
+	# DESTROY!!! temp message
+	await message.delete()
+
+	# find and return associated task
+	winning_description=matches[emojis.index(winning_reaction.emoji)][0]
+	for task in sheet_tasks:
+		if task.description==winning_description:
+			return task
+	
+	# some weird fail
+	return None
+
+@bot.slash_command(
+	name="changediscipline",
+	description="Changes the discipline of a task",
+	guild_ids=[1515128303827292341]
+)
+async def command_changediscipline(ctx,
+	task_description:discord.Option(str),
+	discipline:discord.Option(str,choices=tasks.domains["disciplines"])
+):
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+	
+	# check for a change
+	if task.discipline==discipline:
+		await fail(ctx,f"The discipline of that task is already \"{discipline}\"")
+		return
+
+	# make embed
+	embed:discord.Embed=user_embed(ctx.author,f"changed the discipline of a task to \"{discipline}\"")
+	embed.add_field(name="",value="> "+task.description,inline=False)
+	embed.color=get_element_discord_color(discipline)
+	await ctx.respond(embed=embed)
+
+	# update task
+	task.discipline=discipline
+	task.invalidate()
+
+@bot.slash_command(
+	name="changepriority",
+	description="Changes the priority of a task",
+	guild_ids=[1515128303827292341]
+)
+async def command_changepriority(ctx,
+	task_description:discord.Option(str),
+	priority:discord.Option(str,choices=tasks.domains["priorities"])
+):
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+	
+	# check for a change
+	if task.priority==priority:
+		await fail(ctx,f"The priority of that task is already \"{priority}\"")
+		return
+
+	# make embed
+	embed:discord.Embed=user_embed(ctx.author,f"changed the priority of a task to \"{priority}\"")
+	embed.add_field(name="",value="> "+task.description,inline=False)
+	embed.color=get_element_discord_color(priority)
+	await ctx.respond(embed=embed)
+
+	# update task
+	task.priority=priority
+	task.invalidate()
+
+@bot.slash_command(
+	name="assignuser",
+	description="Assigns a user to a task",
+	guild_ids=[1515128303827292341]
+)
+async def command_assignuser(ctx,
+	task_description:discord.Option(str),
+	user:discord.Option(discord.User)
+):
+	# check that user is registered
+	sheet_user=memory.get_sheet_user(user.id)
+	if sheet_user is None:
+		await fail_notregistered(ctx,user)
+		return
+
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+	
+	# check that user isnt already assigned
+	if sheet_user in task.assigned_users:
+		await fail(ctx,f"{sheet_user} is already assigned to that task")
+		return
+
+	# make embed
+	embed:discord.Embed=user_embed(ctx.author,
+		f"assigned {user.mention if user!=ctx.author else "themself"} (as {sheet_user}) to a task")
+	embed.color=get_element_discord_color(sheet_user)
+	embed.add_field(name="",value="> "+task.description,inline=False)
+	await ctx.respond(embed=embed)
+	
+	# update task
+	task.assigned_users.insert(0,sheet_user)
+	while len(task.assigned_users)>tasks.SHEET_ASSIGNED_USERS_COUNT:
+		task.assigned_users.pop()
+	task.invalidate()
+
+@bot.slash_command(
+	name="setstatus",
+	description="Sets the status of a task",
+	guild_ids=[1515128303827292341]
+)
+async def command_setstatus(ctx,
+	task_description:discord.Option(str),
+	status:discord.Option(str,choices=tasks.domains["statuses"])
+):
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+	
+	# check for a change
+	if task.status==status:
+		await fail(ctx,f"The status of that task is already \"{status}\"")
+		return
+
+	# make embed
+	embed:discord.Embed=user_embed(ctx.author,f"set the status of a task to \"{status}\"")
+	embed.add_field(name="",value="> "+task.description,inline=False)
+	embed.color=get_element_discord_color(status)
+	await ctx.respond(embed=embed)
+
+	# update task
+	task.status=status
+
+	if status==tasks.COMPLETE_STATUS:
+		# set date complete to today
+		task.date_completed=datetime.now().strftime("%m/%d/%Y")
+
+	task.invalidate()
+
+@bot.slash_command(
+	name="setblockers",
+	description="Sets the blockers of a task",
+	guild_ids=[1515128303827292341]
+)
+async def command_setblockers(ctx,
+	task_description:discord.Option(str),
+	blockers:discord.Option(str,required=False)
+):
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+
+	# make embed
+	message:str
+	if blockers is None:
+		blockers=""
+		message="cleared the blockers of a task"
+	else:
+		message=f"set the blockers of a task to \"{blockers}\""
+	
+	embed:discord.Embed=user_embed(ctx.author,message)
+	embed.add_field(name="",value="> "+task.description,inline=False)
+	await ctx.respond(embed=embed)
+
+	# update task
+	task.blockers=blockers
+	task.invalidate()
+
+@bot.slash_command(
+	name="setcomments",
+	description="Sets the comments of a task",
+	guild_ids=[1515128303827292341]
+)
+async def command_setcomments(ctx,
+	task_description:discord.Option(str),
+	comments:discord.Option(str,required=False)
+):
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+
+	# make embed
+	message:str
+	if comments is None:
+		comments=""
+		message="cleared the comments of a task"
+	else:
+		message=f"set the comments of a task to \"{comments}\""
+	
+	embed:discord.Embed=user_embed(ctx.author,message)
+	embed.add_field(name="",value="> "+task.description,inline=False)
+	await ctx.respond(embed=embed)
+
+	# update task
+	task.comments=comments
+	task.invalidate()
 
 @bot.slash_command(
 	name="register",
 	description="Associates your account with a sheet user",
 	guild_ids=[1515128303827292341]
 )
-async def command_register(ctx:discord.context,
+async def command_register(ctx,
 	sheet_user:discord.Option(str,choices=tasks.domains["users"])
 ):
+	# check for a change
+	if memory.get_sheet_user(ctx.author.id)==sheet_user:
+		await fail(ctx,f"You're already registered as \"{sheet_user}\"")
+		return
+
 	memory.set_discord_id_sheet_user(ctx.author.id,sheet_user)
 
 	# make embed
 	embed=user_embed(ctx.author,f"registered themself as \"{sheet_user}\"")
 	await ctx.respond(embed=embed)
+
+@bot.slash_command(
+	name="createtask",
+	description="Creates a task",
+	guild_ids=[1515128303827292341]
+)
+async def command_createtask(ctx,
+	task_description:discord.Option(str),
+	discipline:discord.Option(str,choices=tasks.domains["disciplines"]),
+	priority:discord.Option(str,choices=tasks.domains["priorities"]),
+	status:discord.Option(str,choices=tasks.domains["statuses"],default=tasks.DEFAULT_STATUS),
+):
+	task=tasks.SprintTask()
+	task.description=task_description
+	task.discipline=discipline
+	task.priority=priority
+	task.status=status
+
+	# make embed
+	embed=user_embed(ctx.author,f"created a task")
+	embed.add_field(name="",value=f"> {task_description}",inline=False)
+	embed.color=get_element_discord_color(discipline)
+	await ctx.respond(embed=embed)
+
+	task.invalidate()
+	
+@bot.slash_command(
+	name="organizesheet",
+	description="Organizes all the tasks on the sheet",
+	guild_ids=[1515128303827292341]
+)
+async def command_createtask(ctx):
+	# make embed
+	embed=user_embed(ctx.author,f"organized the sheet")
+	await ctx.respond(embed=embed)
+
+	tasks.organize_sheet()
 
 @bot.event
 async def on_ready():

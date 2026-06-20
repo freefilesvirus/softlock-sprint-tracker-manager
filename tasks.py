@@ -106,9 +106,13 @@ class SprintTask:
 		
 		task_list:list[str]=self.get_list()
 		if task_index==-1:
-			# found no matching description, create a new row to fill
-			sheet.add_rows(worksheet,1)
-			task_index=worksheet.row_count-SHEET_FROM_ROW
+			# special case check to not leave a single empty row at the top
+			if worksheet.row_count==SHEET_FROM_ROW and not get_sheet_task_lists(worksheet):
+				task_index=0
+			else:
+				# found no matching description, create a new row to fill
+				sheet.add_rows(worksheet,1)
+				task_index=worksheet.row_count-SHEET_FROM_ROW
 		else:
 			# found a matching description
 			sheet_task_list:list[str]=sheet_task_lists[task_index]

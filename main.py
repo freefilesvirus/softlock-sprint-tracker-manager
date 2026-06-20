@@ -74,9 +74,13 @@ async def fail_notask(ctx)->None:
 	await fail(ctx,"Couldn't find the task")
 
 async def fail_notregistered(ctx,user:discord.user)->None:
-	await fail(ctx,f"{user.mention} is not registered")
+	await fail(ctx,f"{user.mention} isn't registered as any user")
 
 async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
+	"""
+	from the task description, finds a task from the sheet with a similar description or gives the user an interactive
+	prompt between a few
+	"""
 	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks()
 
 	description=description
@@ -156,8 +160,8 @@ async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 	guild_ids=[1515128303827292341]
 )
 async def command_changediscipline(ctx,
-	task_description:discord.Option(str),
-	discipline:discord.Option(str,choices=tasks.domains["disciplines"])
+	task_description:discord.Option(str,description="The description to find the task"),
+	discipline:discord.Option(str,choices=tasks.domains["disciplines"],description="The discipline to set for the task")
 ):
 	# check that task is valid
 	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
@@ -186,8 +190,8 @@ async def command_changediscipline(ctx,
 	guild_ids=[1515128303827292341]
 )
 async def command_changepriority(ctx,
-	task_description:discord.Option(str),
-	priority:discord.Option(str,choices=tasks.domains["priorities"])
+	task_description:discord.Option(str,description="The description to find the task"),
+	priority:discord.Option(str,choices=tasks.domains["priorities"],description="The priority to set for the task")
 ):
 	# check that task is valid
 	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
@@ -216,8 +220,8 @@ async def command_changepriority(ctx,
 	guild_ids=[1515128303827292341]
 )
 async def command_assignuser(ctx,
-	task_description:discord.Option(str),
-	user:discord.Option(discord.User)
+	task_description:discord.Option(str,description="The description to find the task"),
+	user:discord.Option(discord.User,description="The user to assign to the task")
 ):
 	# check that user is registered
 	sheet_user=memory.get_sheet_user(user.id)
@@ -255,8 +259,8 @@ async def command_assignuser(ctx,
 	guild_ids=[1515128303827292341]
 )
 async def command_setstatus(ctx,
-	task_description:discord.Option(str),
-	status:discord.Option(str,choices=tasks.domains["statuses"])
+	task_description:discord.Option(str,description="The description to find the task"),
+	status:discord.Option(str,choices=tasks.domains["statuses"],description="The status to set for the task")
 ):
 	# check that task is valid
 	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
@@ -290,8 +294,8 @@ async def command_setstatus(ctx,
 	guild_ids=[1515128303827292341]
 )
 async def command_setblockers(ctx,
-	task_description:discord.Option(str),
-	blockers:discord.Option(str,required=False)
+	task_description:discord.Option(str,description="The description to find the task"),
+	blockers:discord.Option(str,required=False,description="The blockers to set for the task")
 ):
 	# check that task is valid
 	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
@@ -321,8 +325,8 @@ async def command_setblockers(ctx,
 	guild_ids=[1515128303827292341]
 )
 async def command_setcomments(ctx,
-	task_description:discord.Option(str),
-	comments:discord.Option(str,required=False)
+	task_description:discord.Option(str,description="The description to find the task"),
+	comments:discord.Option(str,required=False,description="The comments to set for the task")
 ):
 	# check that task is valid
 	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
@@ -352,7 +356,7 @@ async def command_setcomments(ctx,
 	guild_ids=[1515128303827292341]
 )
 async def command_register(ctx,
-	sheet_user:discord.Option(str,choices=tasks.domains["users"])
+	sheet_user:discord.Option(str,choices=tasks.domains["users"],description="The name to assign to your discord account")
 ):
 	# check for a change
 	if memory.get_sheet_user(ctx.author.id)==sheet_user:
@@ -371,10 +375,10 @@ async def command_register(ctx,
 	guild_ids=[1515128303827292341]
 )
 async def command_createtask(ctx,
-	task_description:discord.Option(str),
-	discipline:discord.Option(str,choices=tasks.domains["disciplines"]),
-	priority:discord.Option(str,choices=tasks.domains["priorities"]),
-	status:discord.Option(str,choices=tasks.domains["statuses"],default=tasks.DEFAULT_STATUS),
+	task_description:discord.Option(str,description="The description of the task"),
+	discipline:discord.Option(str,choices=tasks.domains["disciplines"],description="The discipline of the task"),
+	priority:discord.Option(str,choices=tasks.domains["priorities"],description="The priority of the task"),
+	status:discord.Option(str,choices=tasks.domains["statuses"],default=tasks.DEFAULT_STATUS,description="The status of the task"),
 ):
 	task=tasks.SprintTask()
 	task.description=task_description
@@ -391,6 +395,51 @@ async def command_createtask(ctx,
 	task.invalidate()
 	
 @bot.slash_command(
+	name="whois",
+	description="Gets who a user is registered as",
+	guild_ids=[1515128303827292341]
+)
+async def command_assignuser(ctx,user:discord.Option(discord.User,description="The user to check")):
+	embed:discord.Embed=discord.Embed(color=DEFAULT_COLOR)
+
+	sheet_user:str=memory.get_sheet_user(user.id)
+	if sheet_user is None:
+		embed.description=f"{user.mention} isn't registered as any user"
+	else:
+		embed.description=f"{user.mention} is registered as \"{sheet_user}\""
+		embed.color=get_element_discord_color(sheet_user)
+
+	await ctx.respond(embed=embed,ephemeral=True)
+	
+@bot.slash_command(
+	name="getusertasks",
+	description="Gets all tasks assigned to a specific user",
+	guild_ids=[1515128303827292341]
+)
+async def command_getusertasks(ctx,user:discord.Option(discord.User,description="The user to check",required=False)):
+	# set user to author if unspecified
+	if user is None:
+		user=ctx.author
+	
+	# check that theyre registered
+	sheet_user:str=memory.get_sheet_user(user.id)
+	if sheet_user is None:
+		await fail_notregistered(ctx,user)
+		return
+
+	embed=discord.Embed()
+	embed.color=get_element_discord_color(sheet_user)
+	embed.description=f"{user.mention} (as {sheet_user}) is assigned to the following tasks"
+	
+	# get tasks
+	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks()
+	for task in sheet_tasks:
+		if sheet_user in task.assigned_users:
+			embed.add_field(name="",value="> "+task.description,inline=False)
+
+	await ctx.respond(embed=embed,ephemeral=True)
+
+@bot.slash_command(
 	name="organizesheet",
 	description="Organizes all the tasks on the sheet",
 	guild_ids=[1515128303827292341]
@@ -401,6 +450,18 @@ async def command_createtask(ctx):
 	await ctx.respond(embed=embed)
 
 	tasks.organize_sheet()
+
+@bot.slash_command(
+	name="closesprint",
+	description="Finishes the current sprint sheet and creates a new one",
+	guild_ids=[1515128303827292341]
+)
+async def command_closesprint(ctx,archive_title:discord.Option(str,description="The title for the current sprints archive")):
+	# make embed
+	embed=user_embed(ctx.author,f"closed the current sprint sheet and archived it as \"{archive_title}\"")
+	await ctx.respond(embed=embed)
+
+	tasks.close_sprint(archive_title)
 
 @bot.event
 async def on_ready():

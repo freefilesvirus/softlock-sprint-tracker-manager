@@ -178,3 +178,76 @@ def add_rows(worksheet:gspread.worksheet,num_rows:int)->None:
 			add_rows(worksheet,num_rows)
 		else:
 			raise error
+
+# quota protection func
+def append_rows(worksheet:gspread.worksheet,values:list[str])->None:
+	try:
+		worksheet.append_rows(values)
+	except gspread.exceptions.APIError as error:
+		# check if hit quota
+		if error.response.status_code==429:
+			print(HIT_QUOTA_PRINT)
+
+			# wait
+			print("waiting %d seconds..."%BACKOFF_TIME)
+			time.sleep(BACKOFF_TIME)
+
+			# retry
+			append_rows(worksheet,values)
+		else:
+			raise error
+
+# quota protection func
+def delete_rows(worksheet:gspread.worksheet,start_index:int,end_index:int=None)->None:
+	try:
+		worksheet.delete_rows(start_index,end_index)
+	except gspread.exceptions.APIError as error:
+		# check if hit quota
+		if error.response.status_code==429:
+			print(HIT_QUOTA_PRINT)
+
+			# wait
+			print("waiting %d seconds..."%BACKOFF_TIME)
+			time.sleep(BACKOFF_TIME)
+
+			# retry
+			delete_rows(worksheet,start_index,end_index)
+		else:
+			raise error
+
+# quota protection func
+def duplicate(worksheet:gspread.worksheet,insert_sheet_index:int=None,new_sheet_id:int=None,
+		new_sheet_name:str=None)->gspread.Worksheet:
+	try:
+		return worksheet.duplicate(insert_sheet_index,new_sheet_id,new_sheet_name)
+	except gspread.exceptions.APIError as error:
+		# check if hit quota
+		if error.response.status_code==429:
+			print(HIT_QUOTA_PRINT)
+
+			# wait
+			print("waiting %d seconds..."%BACKOFF_TIME)
+			time.sleep(BACKOFF_TIME)
+
+			# retry
+			return duplicate(worksheet,insert_sheet_index,new_sheet_id,new_sheet_name)
+		else:
+			raise error
+
+# quota protection func
+def update_title(worksheet:gspread.worksheet,title:str)->None:
+	try:
+		worksheet.update_title(title)
+	except gspread.exceptions.APIError as error:
+		# check if hit quota
+		if error.response.status_code==429:
+			print(HIT_QUOTA_PRINT)
+
+			# wait
+			print("waiting %d seconds..."%BACKOFF_TIME)
+			time.sleep(BACKOFF_TIME)
+
+			# retry
+			update_title(worksheet,title)
+		else:
+			raise error

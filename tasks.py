@@ -15,6 +15,9 @@ SHEET_ASSIGNED_USERS_COUNT:int=3
 
 SHEET_ELEMENT_COLUMN:int=2
 
+SHEET_CURRENT_TITLE:str="current"
+SHEET_TEMPLATE_TITLE:str="template"
+
 DEFAULT_STATUS="Not started"
 COMPLETE_STATUS="Complete"
 
@@ -158,7 +161,7 @@ def get_element_color(element:str):
 	return None
 
 def get_current_worksheet()->sheet.gspread.worksheet:
-	return sheet.get_worksheet("current")
+	return sheet.get_worksheet(SHEET_CURRENT_TITLE)
 
 def get_sheet_task_lists(worksheet)->list[list[str]]:
 	"""
@@ -223,6 +226,9 @@ def get_sheet_tasks()->list[SprintTask]:
 	return sheet_tasks
 
 def organize_sheet()->None:
+	"""
+	reorganizes the tasks in the current worksheet
+	"""
 	# collect and organize
 	tasks=get_sheet_tasks()
 	tasks.sort(key=SprintTask.sort)
@@ -231,11 +237,30 @@ def organize_sheet()->None:
 	task_lists=[]
 	for task in tasks:
 		task_lists.append(task.get_list())
+
+		# bulk up to the left
+		for _ in range(SHEET_FROM_COLUMN-1):
+			task_lists[-1].append("")
 	
 	# update
 	worksheet=get_current_worksheet()
-	sheet.batch_clear_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
-	sheet.batch_update_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
+	# adds new rows to house the organized tasks and then delete the old rows to avoid a catastrophic event where it
+	# crashes after clearing but before updating and all that data is lost
+	sheet.append_rows(worksheet,task_lists)
+	sheet.delete_rows(worksheet,SHEET_FROM_ROW,len(task_lists)+SHEET_FROM_ROW-1)
+
+def close_sprint(archive_title:str)->None:
+	"""
+	archives the current worksheet and creates a new one
+
+	:param title: the title for the current sheets archive
+	"""
+	# close out the old
+	former_current=get_current_worksheet()
+	sheet.update_title(former_current,archive_title)
+
+	# make the new
+	return sheet.duplicate(sheet.get_worksheet(SHEET_TEMPLATE_TITLE),0,new_sheet_name=SHEET_CURRENT_TITLE)
 
 # collect domains
 for domain in ["disciplines","statuses","priorities","users"]:

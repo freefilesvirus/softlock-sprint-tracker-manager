@@ -242,7 +242,7 @@ async def command_assignuser(ctx,
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx.author,
-		f"assigned {user.mention if user!=ctx.author else "themself"} (as {sheet_user}) to a task")
+		f"assigned {user.mention if user!=ctx.author else 'themself'} (as {sheet_user}) to a task")
 	embed.color=get_element_discord_color(sheet_user)
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	await ctx.respond(embed=embed)

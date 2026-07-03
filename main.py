@@ -156,8 +156,7 @@ async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 
 @bot.slash_command(
 	name="changediscipline",
-	description="Changes the discipline of a task",
-	guild_ids=[1515128303827292341]
+	description="Changes the discipline of a task"
 )
 async def command_changediscipline(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
@@ -186,8 +185,7 @@ async def command_changediscipline(ctx,
 
 @bot.slash_command(
 	name="changepriority",
-	description="Changes the priority of a task",
-	guild_ids=[1515128303827292341]
+	description="Changes the priority of a task"
 )
 async def command_changepriority(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
@@ -216,8 +214,7 @@ async def command_changepriority(ctx,
 
 @bot.slash_command(
 	name="assignuser",
-	description="Assigns a user to a task",
-	guild_ids=[1515128303827292341]
+	description="Assigns a user to a task"
 )
 async def command_assignuser(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
@@ -255,8 +252,7 @@ async def command_assignuser(ctx,
 
 @bot.slash_command(
 	name="setstatus",
-	description="Sets the status of a task",
-	guild_ids=[1515128303827292341]
+	description="Sets the status of a task"
 )
 async def command_setstatus(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
@@ -290,8 +286,7 @@ async def command_setstatus(ctx,
 
 @bot.slash_command(
 	name="setblockers",
-	description="Sets the blockers of a task",
-	guild_ids=[1515128303827292341]
+	description="Sets the blockers of a task"
 )
 async def command_setblockers(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
@@ -321,8 +316,7 @@ async def command_setblockers(ctx,
 
 @bot.slash_command(
 	name="setcomments",
-	description="Sets the comments of a task",
-	guild_ids=[1515128303827292341]
+	description="Sets the comments of a task"
 )
 async def command_setcomments(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
@@ -352,8 +346,7 @@ async def command_setcomments(ctx,
 
 @bot.slash_command(
 	name="register",
-	description="Associates your account with a sheet user",
-	guild_ids=[1515128303827292341]
+	description="Associates your account with a sheet user"
 )
 async def command_register(ctx,
 	sheet_user:discord.Option(str,choices=tasks.domains["users"],description="The name to assign to your discord account")
@@ -371,8 +364,7 @@ async def command_register(ctx,
 
 @bot.slash_command(
 	name="createtask",
-	description="Creates a task",
-	guild_ids=[1515128303827292341]
+	description="Creates a task"
 )
 async def command_createtask(ctx,
 	task_description:discord.Option(str,description="The description of the task"),
@@ -396,8 +388,7 @@ async def command_createtask(ctx,
 	
 @bot.slash_command(
 	name="whois",
-	description="Gets who a user is registered as",
-	guild_ids=[1515128303827292341]
+	description="Gets who a user is registered as"
 )
 async def command_assignuser(ctx,user:discord.Option(discord.User,description="The user to check")):
 	embed:discord.Embed=discord.Embed(color=DEFAULT_COLOR)
@@ -413,8 +404,7 @@ async def command_assignuser(ctx,user:discord.Option(discord.User,description="T
 	
 @bot.slash_command(
 	name="getusertasks",
-	description="Gets all tasks assigned to a specific user",
-	guild_ids=[1515128303827292341]
+	description="Gets all tasks assigned to a specific user"
 )
 async def command_getusertasks(ctx,user:discord.Option(discord.User,description="The user to check",required=False)):
 	# set user to author if unspecified
@@ -441,8 +431,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 
 @bot.slash_command(
 	name="organizesheet",
-	description="Organizes all the tasks on the sheet",
-	guild_ids=[1515128303827292341]
+	description="Organizes all the tasks on the sheet"
 )
 async def command_createtask(ctx):
 	# make embed
@@ -453,8 +442,7 @@ async def command_createtask(ctx):
 
 @bot.slash_command(
 	name="closesprint",
-	description="Finishes the current sprint sheet and creates a new one",
-	guild_ids=[1515128303827292341]
+	description="Finishes the current sprint sheet and creates a new one"
 )
 async def command_closesprint(ctx,archive_title:discord.Option(str,description="The title for the current sprints archive")):
 	# make embed

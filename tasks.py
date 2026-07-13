@@ -241,17 +241,11 @@ def organize_sheet()->None:
 	task_lists=[]
 	for task in tasks:
 		task_lists.append(task.get_list())
-
-		# bulk up to the left
-		for _ in range(SHEET_FROM_COLUMN-1):
-			task_lists[-1].append("")
 	
 	# update
 	worksheet=get_current_worksheet()
-	# adds new rows to house the organized tasks and then delete the old rows to avoid a catastrophic event where it
-	# crashes after clearing but before updating and all that data is lost
-	sheet.append_rows(worksheet,task_lists)
-	sheet.delete_rows(worksheet,SHEET_FROM_ROW,len(task_lists)+SHEET_FROM_ROW-1)
+	sheet.batch_clear_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
+	sheet.batch_update_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
 
 def close_sprint(archive_title:str)->None:
 	"""

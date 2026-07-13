@@ -19,12 +19,12 @@ MEMORY_LEAD_CATEGORY="leads"
 
 bot=commands.Bot()
 
-# region discord id <-> sheet user memory functions
-def set_discord_id_sheet_user(guild_id:int,discord_id:int,sheet_user:str)->None:
+# region memory functions
+def set_discord_user_sheet_user(guild_id:int,discord_user:discord.user,sheet_user:str)->None:
 	"""
 	saves a persistent association between a discord id and sheet user name
 	"""
-	memory.set_category_key_value(guild_id,MEMORY_USER_CATEGORY,str(discord_id),sheet_user)
+	memory.set_category_key_value(guild_id,MEMORY_USER_CATEGORY,str(discord_user.id),sheet_user)
 
 def get_discord_id(guild_id:int,sheet_user:str)->int:
 	"""
@@ -32,11 +32,12 @@ def get_discord_id(guild_id:int,sheet_user:str)->int:
 	"""
 	return memory.get_category_key(guild_id,MEMORY_USER_CATEGORY,sheet_user)
 
-def get_sheet_user(guild_id:int,discord_id:int)->str:
+def get_sheet_user(guild_id:int,discord_user:discord.user)->str:
 	"""
 	returns the sheet user name associated with the discord id
 	"""
-	return memory.get_category_value(guild_id,MEMORY_USER_CATEGORY,str(discord_id))
+	return memory.get_category_value(guild_id,MEMORY_USER_CATEGORY,str(discord_user.id))
+
 # endregion
 
 # region misc util functions
@@ -86,7 +87,7 @@ def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 	e.g. "created a task" or "registered as user"
 	"""
 	embed:discord.Embed=discord.Embed(
-		color=get_element_discord_color(get_sheet_user(ctx.guild.id,discord_user.id))
+		color=get_element_discord_color(get_sheet_user(ctx.guild.id,discord_user))
 	)
 	# set user
 	embed.set_author(name=discord_user.display_name,icon_url=discord_user.display_avatar)
@@ -261,7 +262,7 @@ async def command_assignuser(ctx,
 	user:discord.Option(discord.User,description="The user to assign to the task")
 ):
 	# check that user is registered
-	sheet_user=get_sheet_user(ctx.guild.id,user.id)
+	sheet_user=get_sheet_user(ctx.guild.id,user)
 	if sheet_user is None:
 		await fail_notregistered(ctx,user)
 		return
@@ -392,11 +393,11 @@ async def command_register(ctx,
 	sheet_user:discord.Option(str,choices=tasks.domains["users"],description="The name to assign to your discord account")
 ):
 	# check for a change
-	if get_sheet_user(ctx.guild.id,ctx.author.id)==sheet_user:
+	if get_sheet_user(ctx.guild.id,ctx.author)==sheet_user:
 		await fail(ctx,f"You're already registered as \"{sheet_user}\"")
 		return
 
-	set_discord_id_sheet_user(ctx.guild.id,ctx.author.id,sheet_user)
+	set_discord_user_sheet_user(ctx.guild.id,ctx.author,sheet_user)
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"registered themself as \"{sheet_user}\"")
@@ -433,7 +434,7 @@ async def command_createtask(ctx,
 async def command_assignuser(ctx,user:discord.Option(discord.User,description="The user to check")):
 	embed:discord.Embed=discord.Embed(color=DEFAULT_COLOR)
 
-	sheet_user:str=get_sheet_user(ctx.guild.id,user.id)
+	sheet_user:str=get_sheet_user(ctx.guild.id,user)
 	if sheet_user is None:
 		embed.description=f"{user.mention} isn't registered as any user"
 	else:
@@ -452,7 +453,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 		user=ctx.author
 	
 	# check that theyre registered
-	sheet_user:str=get_sheet_user(ctx.guild.id,user.id)
+	sheet_user:str=get_sheet_user(ctx.guild.id,user)
 	if sheet_user is None:
 		await fail_notregistered(ctx,user)
 		return

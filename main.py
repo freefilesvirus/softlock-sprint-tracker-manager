@@ -42,7 +42,7 @@ def get_element_discord_color(element:str)->discord.Color:
 		int((color.blue or 0)*255)
 	)
 
-def user_embed(discord_user:discord.user,action:str="")->discord.Embed:
+def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 	"""
 	creates an embed colored after the user with a description of what they did
 
@@ -50,7 +50,7 @@ def user_embed(discord_user:discord.user,action:str="")->discord.Embed:
 	e.g. "created a task" or "registered as user"
 	"""
 	embed:discord.Embed=discord.Embed(
-		color=get_element_discord_color(memory.get_sheet_user(discord_user.id))
+		color=get_element_discord_color(memory.get_sheet_user(ctx.guild.id,discord_user.id))
 	)
 	# set user
 	embed.set_author(name=discord_user.display_name,icon_url=discord_user.display_avatar)
@@ -102,7 +102,7 @@ async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 	await ctx.defer()
 	
 	# offer similar tasks
-	embed=user_embed(ctx.author)
+	embed=user_embed(ctx,ctx.author)
 	embed.add_field(name="",value="Invalid task! Did you mean one of the following?",inline=False)
 	emojis:list[str]=[]
 	for i,match in enumerate(matches):
@@ -174,7 +174,7 @@ async def command_changediscipline(ctx,
 		return
 
 	# make embed
-	embed:discord.Embed=user_embed(ctx.author,f"changed the discipline of a task to \"{discipline}\"")
+	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the discipline of a task to \"{discipline}\"")
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	embed.color=get_element_discord_color(discipline)
 	await ctx.respond(embed=embed)
@@ -203,7 +203,7 @@ async def command_changepriority(ctx,
 		return
 
 	# make embed
-	embed:discord.Embed=user_embed(ctx.author,f"changed the priority of a task to \"{priority}\"")
+	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the priority of a task to \"{priority}\"")
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	embed.color=get_element_discord_color(priority)
 	await ctx.respond(embed=embed)
@@ -221,7 +221,7 @@ async def command_assignuser(ctx,
 	user:discord.Option(discord.User,description="The user to assign to the task")
 ):
 	# check that user is registered
-	sheet_user=memory.get_sheet_user(user.id)
+	sheet_user=memory.get_sheet_user(ctx.guild.id,user.id)
 	if sheet_user is None:
 		await fail_notregistered(ctx,user)
 		return
@@ -238,7 +238,7 @@ async def command_assignuser(ctx,
 		return
 
 	# make embed
-	embed:discord.Embed=user_embed(ctx.author,
+	embed:discord.Embed=user_embed(ctx,ctx.author,
 		f"assigned {user.mention if user!=ctx.author else 'themself'} (as {sheet_user}) to a task")
 	embed.color=get_element_discord_color(sheet_user)
 	embed.add_field(name="",value="> "+task.description,inline=False)
@@ -270,7 +270,7 @@ async def command_setstatus(ctx,
 		return
 
 	# make embed
-	embed:discord.Embed=user_embed(ctx.author,f"set the status of a task to \"{status}\"")
+	embed:discord.Embed=user_embed(ctx,ctx.author,f"set the status of a task to \"{status}\"")
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	embed.color=get_element_discord_color(status)
 	await ctx.respond(embed=embed)
@@ -306,7 +306,7 @@ async def command_setblockers(ctx,
 	else:
 		message=f"set the blockers of a task to \"{blockers}\""
 	
-	embed:discord.Embed=user_embed(ctx.author,message)
+	embed:discord.Embed=user_embed(ctx,ctx.author,message)
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	await ctx.respond(embed=embed)
 
@@ -336,7 +336,7 @@ async def command_setcomments(ctx,
 	else:
 		message=f"set the comments of a task to \"{comments}\""
 	
-	embed:discord.Embed=user_embed(ctx.author,message)
+	embed:discord.Embed=user_embed(ctx,ctx.author,message)
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	await ctx.respond(embed=embed)
 
@@ -352,14 +352,14 @@ async def command_register(ctx,
 	sheet_user:discord.Option(str,choices=tasks.domains["users"],description="The name to assign to your discord account")
 ):
 	# check for a change
-	if memory.get_sheet_user(ctx.author.id)==sheet_user:
+	if memory.get_sheet_user(ctx.guild.id,ctx.author.id)==sheet_user:
 		await fail(ctx,f"You're already registered as \"{sheet_user}\"")
 		return
 
-	memory.set_discord_id_sheet_user(ctx.author.id,sheet_user)
+	memory.set_discord_id_sheet_user(ctx.guild.id,ctx.author.id,sheet_user)
 
 	# make embed
-	embed=user_embed(ctx.author,f"registered themself as \"{sheet_user}\"")
+	embed=user_embed(ctx,ctx.author,f"registered themself as \"{sheet_user}\"")
 	await ctx.respond(embed=embed)
 
 @bot.slash_command(
@@ -379,7 +379,7 @@ async def command_createtask(ctx,
 	task.status=status
 
 	# make embed
-	embed=user_embed(ctx.author,f"created a task")
+	embed=user_embed(ctx,ctx.author,f"created a task")
 	embed.add_field(name="",value=f"> {task_description}",inline=False)
 	embed.color=get_element_discord_color(discipline)
 	await ctx.respond(embed=embed)
@@ -393,7 +393,7 @@ async def command_createtask(ctx,
 async def command_assignuser(ctx,user:discord.Option(discord.User,description="The user to check")):
 	embed:discord.Embed=discord.Embed(color=DEFAULT_COLOR)
 
-	sheet_user:str=memory.get_sheet_user(user.id)
+	sheet_user:str=memory.get_sheet_user(ctx.guild.id,user.id)
 	if sheet_user is None:
 		embed.description=f"{user.mention} isn't registered as any user"
 	else:
@@ -412,7 +412,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 		user=ctx.author
 	
 	# check that theyre registered
-	sheet_user:str=memory.get_sheet_user(user.id)
+	sheet_user:str=memory.get_sheet_user(ctx.guild.id,user.id)
 	if sheet_user is None:
 		await fail_notregistered(ctx,user)
 		return
@@ -435,7 +435,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 )
 async def command_createtask(ctx):
 	# make embed
-	embed=user_embed(ctx.author,f"organized the sheet")
+	embed=user_embed(ctx,ctx.author,f"organized the sheet")
 	await ctx.respond(embed=embed)
 
 	tasks.organize_sheet()
@@ -446,7 +446,7 @@ async def command_createtask(ctx):
 )
 async def command_closesprint(ctx,archive_title:discord.Option(str,description="The title for the current sprints archive")):
 	# make embed
-	embed=user_embed(ctx.author,f"closed the current sprint sheet and archived it as \"{archive_title}\"")
+	embed=user_embed(ctx,ctx.author,f"closed the current sprint sheet and archived it as \"{archive_title}\"")
 	await ctx.respond(embed=embed)
 
 	tasks.close_sprint(archive_title)

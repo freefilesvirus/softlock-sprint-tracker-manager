@@ -231,6 +231,11 @@ async def command_changediscipline(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
 	discipline:discord.Option(str,choices=tasks.domains["disciplines"],description="The discipline to set for the task")
 ):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
 	# check that task is valid
 	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
 	if task is None:
@@ -260,6 +265,11 @@ async def command_changepriority(ctx,
 	task_description:discord.Option(str,description="The description to find the task"),
 	priority:discord.Option(str,choices=tasks.domains["priorities"],description="The priority to set for the task")
 ):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
 	# check that task is valid
 	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
 	if task is None:
@@ -441,6 +451,11 @@ async def command_createtask(ctx,
 	priority:discord.Option(str,choices=tasks.domains["priorities"],description="The priority of the task"),
 	status:discord.Option(str,choices=tasks.domains["statuses"],default=tasks.DEFAULT_STATUS,description="The status of the task"),
 ):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
 	task=tasks.SprintTask()
 	task.description=task_description
 	task.discipline=discipline
@@ -502,7 +517,12 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 	name="organizesheet",
 	description="Organizes all the tasks on the sheet"
 )
-async def command_createtask(ctx):
+async def command_organizesheet(ctx):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"organized the sheet")
 	await ctx.respond(embed=embed)
@@ -514,6 +534,11 @@ async def command_createtask(ctx):
 	description="Finishes the current sprint sheet and creates a new one"
 )
 async def command_closesprint(ctx,archive_title:discord.Option(str,description="The title for the current sprints archive")):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"closed the current sprint sheet and archived it as \"{archive_title}\"")
 	await ctx.respond(embed=embed)

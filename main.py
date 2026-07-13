@@ -628,7 +628,7 @@ async def command_revokelead(ctx,user:discord.Option(discord.User,description="T
 
 @bot.slash_command(
 	name="setalertchannel",
-	description="Sets the channel this command was sent in the alert channel",guild_ids=[1515128303827292341]
+	description="Sets the channel this command was sent in the alert channel"
 )
 async def command_setalertchannel(ctx):
 	# check for authority

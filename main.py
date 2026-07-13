@@ -520,7 +520,7 @@ async def command_assignuser(ctx,user:discord.Option(discord.User,description="T
 	if sheet_user is None:
 		embed.description=f"{user.mention} isn't registered as any user"
 	else:
-		embed.description=f"{user.mention} is{' a lead and' if get_user_is_lead(ctx,user) else ""} registered as \"{sheet_user}\""
+		embed.description=f"{user.mention} is{' a lead and' if get_user_is_lead(ctx,user) else ''} registered as \"{sheet_user}\""
 		embed.color=get_element_discord_color(sheet_user)
 
 	await ctx.respond(embed=embed,ephemeral=True)

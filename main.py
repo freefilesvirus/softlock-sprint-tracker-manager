@@ -20,36 +20,61 @@ MEMORY_LEAD_CATEGORY="leads"
 bot=commands.Bot()
 
 # region memory functions
-def set_discord_user_sheet_user(guild_id:int,discord_user:discord.user,sheet_user:str)->None:
+def set_discord_user_sheet_user(ctx,discord_user:discord.user,sheet_user:str)->None:
 	"""
 	saves a persistent association between a discord id and sheet user name
 	"""
-	memory.set_category_key_value(guild_id,MEMORY_USER_CATEGORY,str(discord_user.id),sheet_user)
+	memory.set_category_key_value(ctx.guild.id,MEMORY_USER_CATEGORY,str(discord_user.id),sheet_user)
 
-def get_discord_id(guild_id:int,sheet_user:str)->int:
+def get_discord_id(ctx,sheet_user:str)->int:
 	"""
 	returns the discord id associated with the sheet user name
 	"""
-	return memory.get_category_key(guild_id,MEMORY_USER_CATEGORY,sheet_user)
+	return memory.get_category_key(ctx.guild.id,MEMORY_USER_CATEGORY,sheet_user)
 
-def get_sheet_user(guild_id:int,discord_user:discord.user)->str:
+def get_sheet_user(ctx,discord_user:discord.user)->str:
 	"""
 	returns the sheet user name associated with the discord id
 	"""
-	return memory.get_category_value(guild_id,MEMORY_USER_CATEGORY,str(discord_user.id))
+	return memory.get_category_value(ctx.guild.id,MEMORY_USER_CATEGORY,str(discord_user.id))
 
+def get_user_is_lead(ctx,discord_user:discord.user)->bool:
+	lead_category:list=memory.get_category(ctx.guild.id,MEMORY_LEAD_CATEGORY)
+
+	# false if lead category isnt valid
+	if lead_category is None:
+		return False
+	
+	# return if discord id is in category
+	return str(discord_user.id) in lead_category
+
+def set_user_is_lead(ctx,discord_user:discord.user,is_lead:bool)->None:
+	# return if no change
+	if get_user_is_lead(ctx,discord_user)==is_lead:
+		return
+
+	lead_category:list=memory.get_category(ctx.guild.id,MEMORY_LEAD_CATEGORY)
+	if lead_category is None:
+		# make it somethin
+		lead_category=[]
+
+	discord_user_str:str=str(discord_user.id)
+	if is_lead:
+		# add to list
+		lead_category.append(discord_user_str)
+	else:
+		# remove from list
+		lead_category.remove(discord_user_str)
+
+	memory.set_category(ctx.guild.id,MEMORY_LEAD_CATEGORY,lead_category)
 # endregion
 
 # region misc util functions
-def get_user_has_authority(user:discord.user)->bool:
-	# check if they have admin perms
-	if user.guild_permissions.administrator:
-		return True
-
-	# check if they have lead perms
-	
-	# nop
-	return False
+def get_user_has_authority(ctx,user:discord.user)->bool:
+	"""
+	returns if the user is a server admin or lead
+	"""
+	return user.guild_permissions.administrator or get_user_is_lead(ctx,user)
 
 async def get_user_from_id(discord_id:int)->discord.user:
 	"""
@@ -87,7 +112,7 @@ def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 	e.g. "created a task" or "registered as user"
 	"""
 	embed:discord.Embed=discord.Embed(
-		color=get_element_discord_color(get_sheet_user(ctx.guild.id,discord_user))
+		color=get_element_discord_color(get_sheet_user(ctx,discord_user))
 	)
 	# set user
 	embed.set_author(name=discord_user.display_name,icon_url=discord_user.display_avatar)
@@ -192,6 +217,9 @@ async def fail_notask(ctx)->None:
 
 async def fail_notregistered(ctx,user:discord.user)->None:
 	await fail(ctx,f"{user.mention} isn't registered as any user")
+
+async def fail_noauth(ctx)->None:
+	await fail(ctx,"You don't have permission to use that command")
 # endregion
 
 # region bot commands
@@ -262,7 +290,7 @@ async def command_assignuser(ctx,
 	user:discord.Option(discord.User,description="The user to assign to the task")
 ):
 	# check that user is registered
-	sheet_user=get_sheet_user(ctx.guild.id,user)
+	sheet_user=get_sheet_user(ctx,user)
 	if sheet_user is None:
 		await fail_notregistered(ctx,user)
 		return
@@ -393,11 +421,11 @@ async def command_register(ctx,
 	sheet_user:discord.Option(str,choices=tasks.domains["users"],description="The name to assign to your discord account")
 ):
 	# check for a change
-	if get_sheet_user(ctx.guild.id,ctx.author)==sheet_user:
+	if get_sheet_user(ctx,ctx.author)==sheet_user:
 		await fail(ctx,f"You're already registered as \"{sheet_user}\"")
 		return
 
-	set_discord_user_sheet_user(ctx.guild.id,ctx.author,sheet_user)
+	set_discord_user_sheet_user(ctx,ctx.author,sheet_user)
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"registered themself as \"{sheet_user}\"")
@@ -434,11 +462,11 @@ async def command_createtask(ctx,
 async def command_assignuser(ctx,user:discord.Option(discord.User,description="The user to check")):
 	embed:discord.Embed=discord.Embed(color=DEFAULT_COLOR)
 
-	sheet_user:str=get_sheet_user(ctx.guild.id,user)
+	sheet_user:str=get_sheet_user(ctx,user)
 	if sheet_user is None:
 		embed.description=f"{user.mention} isn't registered as any user"
 	else:
-		embed.description=f"{user.mention} is registered as \"{sheet_user}\""
+		embed.description=f"{user.mention} is{" a lead and" if get_user_is_lead(ctx,user) else ""} registered as \"{sheet_user}\""
 		embed.color=get_element_discord_color(sheet_user)
 
 	await ctx.respond(embed=embed,ephemeral=True)
@@ -453,7 +481,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 		user=ctx.author
 	
 	# check that theyre registered
-	sheet_user:str=get_sheet_user(ctx.guild.id,user)
+	sheet_user:str=get_sheet_user(ctx,user)
 	if sheet_user is None:
 		await fail_notregistered(ctx,user)
 		return
@@ -491,6 +519,48 @@ async def command_closesprint(ctx,archive_title:discord.Option(str,description="
 	await ctx.respond(embed=embed)
 
 	tasks.close_sprint(archive_title)
+
+@bot.slash_command(
+	name="makelead",
+	description="Gives a user lead permissions"
+)
+async def command_makelead(ctx,user:discord.Option(discord.User,description="The user to make a lead")):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
+	# check that they arent already a lead
+	if get_user_is_lead(ctx,user):
+		await fail(ctx,f"{user.mention} is already a lead")
+		return
+	
+	# make embed
+	embed=user_embed(ctx,user,f"made {user.mention} a lead")
+	await ctx.respond(embed=embed)
+
+	set_user_is_lead(ctx,user,True)
+
+@bot.slash_command(
+	name="revokelead",
+	description="Removes lead permissions from a user"
+)
+async def command_revokelead(ctx,user:discord.Option(discord.User,description="The user to revoke lead permissions")):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
+	# check that they are a lead
+	if not get_user_is_lead(ctx,user):
+		await fail(ctx,f"{user.mention} isn't a lead")
+		return
+	
+	# make embed
+	embed=user_embed(ctx,user,f"revoked lead permissions from {user.mention}")
+	await ctx.respond(embed=embed)
+
+	set_user_is_lead(ctx,user,False)
 # endregion
 
 @bot.event

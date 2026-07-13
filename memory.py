@@ -63,9 +63,9 @@ def set_category_key_value(guild_id:int,category:str,key:str,value:str)->None:
 
 	save_data()
 
-def get_category_key_value(guild_id:int,category:str,key:str)->str:
+def get_category_value(guild_id:int,category:str,key:str)->str:
 	"""
-	gets a keys value in a category in a guild
+	gets the value associated with a key in a category in a guild
 	"""
 	# check if dict tree exists
 	guild_str=str(guild_id)
@@ -73,6 +73,20 @@ def get_category_key_value(guild_id:int,category:str,key:str)->str:
 		return None
 
 	return data[guild_str][category][key]
+
+def get_category_key(guild_id:int,category:str,value:str)->str:
+	"""
+	gets the key associated with a value in a category in a guild
+	"""
+	# check if dict tree exists
+	guild_str=str(guild_id)
+	if not guild_str in data or not category in data[guild_str]:
+		return None
+	
+	# loop through all keys to find if any are associated with the value
+	for key,v in get_category(guild_id,category):
+		if v==value:
+			return key
 
 def set_discord_id_sheet_user(guild_id:int,discord_id:int,sheet_user:str)->None:
 	"""
@@ -84,12 +98,10 @@ def get_discord_id(guild_id:int,sheet_user:str)->int:
 	"""
 	returns the discord id associated with the sheet user name
 	"""
-	for discord,sheet in get_category(guild_id,"users"):
-		if sheet==sheet_user:
-			return discord
+	return get_category_key(guild_id,"users",sheet_user)
 
 def get_sheet_user(guild_id:int,discord_id:int)->str:
 	"""
 	returns the sheet user name associated with the discord id
 	"""
-	return get_category_key_value(guild_id,"users",str(discord_id))
+	return get_category_value(guild_id,"users",str(discord_id))

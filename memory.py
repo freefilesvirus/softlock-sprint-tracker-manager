@@ -87,21 +87,3 @@ def get_category_key(guild_id:int,category:str,value:str)->str:
 	for key,v in get_category(guild_id,category):
 		if v==value:
 			return key
-
-def set_discord_id_sheet_user(guild_id:int,discord_id:int,sheet_user:str)->None:
-	"""
-	saves a persistent association between a discord id and sheet user name
-	"""
-	set_category_key_value(guild_id,"users",str(discord_id),sheet_user)
-
-def get_discord_id(guild_id:int,sheet_user:str)->int:
-	"""
-	returns the discord id associated with the sheet user name
-	"""
-	return get_category_key(guild_id,"users",sheet_user)
-
-def get_sheet_user(guild_id:int,discord_id:int)->str:
-	"""
-	returns the sheet user name associated with the discord id
-	"""
-	return get_category_value(guild_id,"users",str(discord_id))

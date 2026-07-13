@@ -5,6 +5,7 @@ import rapidfuzz
 import memory
 import tasks
 
+# region const variables
 DEFAULT_COLOR=discord.Color.from_rgb(255,234,124)
 
 NUMBER_EMOJIS:list[str]=["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
@@ -12,25 +13,42 @@ NUMBER_EMOJIS:list[str]=["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣"]
 # accuracy percent to immediately accept above
 ACCEPTABLE_TASK_SIMILARITY=95
 
+MEMORY_USER_CATEGORY="users"
+MEMORY_LEAD_CATEGORY="leads"
+# endregion
+
 bot=commands.Bot()
 
+# region discord id <-> sheet user memory functions
 def set_discord_id_sheet_user(guild_id:int,discord_id:int,sheet_user:str)->None:
 	"""
 	saves a persistent association between a discord id and sheet user name
 	"""
-	memory.set_category_key_value(guild_id,"users",str(discord_id),sheet_user)
+	memory.set_category_key_value(guild_id,MEMORY_USER_CATEGORY,str(discord_id),sheet_user)
 
 def get_discord_id(guild_id:int,sheet_user:str)->int:
 	"""
 	returns the discord id associated with the sheet user name
 	"""
-	return memory.get_category_key(guild_id,"users",sheet_user)
+	return memory.get_category_key(guild_id,MEMORY_USER_CATEGORY,sheet_user)
 
 def get_sheet_user(guild_id:int,discord_id:int)->str:
 	"""
 	returns the sheet user name associated with the discord id
 	"""
-	return memory.get_category_value(guild_id,"users",str(discord_id))
+	return memory.get_category_value(guild_id,MEMORY_USER_CATEGORY,str(discord_id))
+# endregion
+
+# region misc util functions
+def get_user_has_authority(user:discord.user)->bool:
+	# check if they have admin perms
+	if user.guild_permissions.administrator:
+		return True
+
+	# check if they have lead perms
+	
+	# nop
+	return False
 
 async def get_user_from_id(discord_id:int)->discord.user:
 	"""
@@ -42,16 +60,6 @@ async def get_user_from_id(discord_id:int)->discord.user:
 	
 	# might still exist, just not cached
 	return await bot.fetch_user(discord_id)
-
-def get_user_has_authority(user:discord.user)->bool:
-	# check if they have admin perms
-	if user.guild_permissions.administrator:
-		return True
-
-	# check if they have lead perms
-	
-	# nop
-	return False
 
 def get_element_discord_color(element:str)->discord.Color:
 	"""
@@ -88,21 +96,6 @@ def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 		embed.description=f"{discord_user.mention} {action}"
 
 	return embed
-
-async def fail(ctx,message:str)->None:
-	"""
-	creates an ephemeral message indicating the command failed
-	"""
-	await ctx.respond(
-		embed=discord.Embed(color=DEFAULT_COLOR,description=f"Operation failed! {message}"),
-		ephemeral=True
-	)
-
-async def fail_notask(ctx)->None:
-	await fail(ctx,"Couldn't find the task")
-
-async def fail_notregistered(ctx,user:discord.user)->None:
-	await fail(ctx,f"{user.mention} isn't registered as any user")
 
 async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 	"""
@@ -181,7 +174,26 @@ async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 	
 	# some weird fail
 	return None
+# endregion
 
+# region fail functions
+async def fail(ctx,message:str)->None:
+	"""
+	creates an ephemeral message indicating the command failed
+	"""
+	await ctx.respond(
+		embed=discord.Embed(color=DEFAULT_COLOR,description=f"Operation failed! {message}"),
+		ephemeral=True
+	)
+
+async def fail_notask(ctx)->None:
+	await fail(ctx,"Couldn't find the task")
+
+async def fail_notregistered(ctx,user:discord.user)->None:
+	await fail(ctx,f"{user.mention} isn't registered as any user")
+# endregion
+
+# region bot commands
 @bot.slash_command(
 	name="changediscipline",
 	description="Changes the discipline of a task"
@@ -478,6 +490,7 @@ async def command_closesprint(ctx,archive_title:discord.Option(str,description="
 	await ctx.respond(embed=embed)
 
 	tasks.close_sprint(archive_title)
+# endregion
 
 @bot.event
 async def on_ready():

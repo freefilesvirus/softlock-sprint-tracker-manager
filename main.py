@@ -15,6 +15,7 @@ ACCEPTABLE_TASK_SIMILARITY=95
 
 MEMORY_USER_CATEGORY="users"
 MEMORY_LEAD_CATEGORY="leads"
+MEMORY_ALERT_CHANNEL_CATEGORY="alert_channel"
 # endregion
 
 bot=commands.Bot()
@@ -67,6 +68,24 @@ def set_user_is_lead(ctx,discord_user:discord.user,is_lead:bool)->None:
 		lead_category.remove(discord_user_str)
 
 	memory.set_category(ctx.guild.id,MEMORY_LEAD_CATEGORY,lead_category)
+
+async def get_alert_channel(ctx)->discord.channel:
+	channel_id:int=memory.get_category(ctx.guild.id,MEMORY_ALERT_CHANNEL_CATEGORY)
+	if channel_id is None:
+		# return channel that this command was sent in
+		return ctx.channel
+	
+	# get alleged channel
+	alleged_channel:discord.channel=bot.get_channel(channel_id)
+	if alleged_channel is None:
+		# it might just not be cached, so try this
+		alleged_channel = await bot.fetch_channel(channel_id)
+
+	# return the stored channel, or if its invalid the current channel
+	return alleged_channel if not alleged_channel is None else ctx.channel
+
+def set_alert_channel(ctx,channel:discord.channel)->None:
+	memory.set_category(ctx.guild.id,MEMORY_ALERT_CHANNEL_CATEGORY,channel.id)
 # endregion
 
 # region misc util functions
@@ -123,6 +142,23 @@ def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 
 	return embed
 
+async def send_alert(ctx,embed:discord.Embed)->None:
+	alert_channel:discord.channel=await get_alert_channel(ctx)
+	await alert_channel.send(embed=embed)
+
+async def respond_and_alert(ctx,embed:discord.Embed)->None:
+	"""
+	responds to the context with an ephemeral version of the embed and sends an alert with a normal version
+	"""
+	if await get_alert_channel(ctx)==ctx.channel:
+		# no need for an ephemeral version
+		await ctx.respond(embed=embed)
+	else:
+		# send local
+		await ctx.respond(embed=embed,ephemeral=True)
+		# send alert
+		await send_alert(ctx,embed)
+
 async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 	"""
 	from the task description, finds a task from the sheet with a similar description or gives the user an interactive
@@ -146,7 +182,10 @@ async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 					return task
 
 	# its gonna be a second
-	await ctx.defer()
+	if ctx.channel==await get_alert_channel(ctx):
+		await ctx.defer()
+	else:
+		await ctx.defer(ephemeral=True)
 	
 	# offer similar tasks
 	embed=user_embed(ctx,ctx.author)
@@ -251,7 +290,7 @@ async def command_changediscipline(ctx,
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the discipline of a task to \"{discipline}\"")
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	embed.color=get_element_discord_color(discipline)
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	# update task
 	task.discipline=discipline
@@ -285,7 +324,7 @@ async def command_changepriority(ctx,
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the priority of a task to \"{priority}\"")
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	embed.color=get_element_discord_color(priority)
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	# update task
 	task.priority=priority
@@ -321,7 +360,7 @@ async def command_assignuser(ctx,
 		f"assigned {user.mention if user!=ctx.author else 'themself'} (as {sheet_user}) to a task")
 	embed.color=get_element_discord_color(sheet_user)
 	embed.add_field(name="",value="> "+task.description,inline=False)
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 	
 	# update task
 	task.assigned_users.insert(0,sheet_user)
@@ -352,7 +391,7 @@ async def command_setstatus(ctx,
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"set the status of a task to \"{status}\"")
 	embed.add_field(name="",value="> "+task.description,inline=False)
 	embed.color=get_element_discord_color(status)
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	# update task
 	task.status=status
@@ -387,7 +426,7 @@ async def command_setblockers(ctx,
 	
 	embed:discord.Embed=user_embed(ctx,ctx.author,message)
 	embed.add_field(name="",value="> "+task.description,inline=False)
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	# update task
 	task.blockers=blockers
@@ -417,7 +456,7 @@ async def command_setcomments(ctx,
 	
 	embed:discord.Embed=user_embed(ctx,ctx.author,message)
 	embed.add_field(name="",value="> "+task.description,inline=False)
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	# update task
 	task.comments=comments
@@ -439,7 +478,7 @@ async def command_register(ctx,
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"registered themself as \"{sheet_user}\"")
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 @bot.slash_command(
 	name="createtask",
@@ -466,7 +505,7 @@ async def command_createtask(ctx,
 	embed=user_embed(ctx,ctx.author,f"created a task")
 	embed.add_field(name="",value=f"> {task_description}",inline=False)
 	embed.color=get_element_discord_color(discipline)
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	task.invalidate()
 	
@@ -525,7 +564,7 @@ async def command_organizesheet(ctx):
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"organized the sheet")
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	tasks.organize_sheet()
 
@@ -541,7 +580,7 @@ async def command_closesprint(ctx,archive_title:discord.Option(str,description="
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"closed the current sprint sheet and archived it as \"{archive_title}\"")
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	tasks.close_sprint(archive_title)
 
@@ -562,7 +601,7 @@ async def command_makelead(ctx,user:discord.Option(discord.User,description="The
 	
 	# make embed
 	embed=user_embed(ctx,user,f"made {user.mention} a lead")
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	set_user_is_lead(ctx,user,True)
 
@@ -583,9 +622,23 @@ async def command_revokelead(ctx,user:discord.Option(discord.User,description="T
 	
 	# make embed
 	embed=user_embed(ctx,user,f"revoked lead permissions from {user.mention}")
-	await ctx.respond(embed=embed)
+	await respond_and_alert(ctx,embed)
 
 	set_user_is_lead(ctx,user,False)
+
+@bot.slash_command(
+	name="setalertchannel",
+	description="Sets the channel this command was sent in the alert channel",guild_ids=[1515128303827292341]
+)
+async def command_setalertchannel(ctx):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
+	set_alert_channel(ctx,ctx.channel)
+
+	await respond_and_alert(ctx,user_embed(ctx,ctx.author,f"set the alert channel to {ctx.channel.mention}"))
 # endregion
 
 @bot.event

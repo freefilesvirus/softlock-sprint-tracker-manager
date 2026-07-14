@@ -600,7 +600,7 @@ async def command_makelead(ctx,user:discord.Option(discord.User,description="The
 		return
 	
 	# make embed
-	embed=user_embed(ctx,user,f"made {user.mention} a lead")
+	embed=user_embed(ctx,ctx.author,f"made {user.mention} a lead")
 	await respond_and_alert(ctx,embed)
 
 	set_user_is_lead(ctx,user,True)

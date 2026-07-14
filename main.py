@@ -621,7 +621,7 @@ async def command_revokelead(ctx,user:discord.Option(discord.User,description="T
 		return
 	
 	# make embed
-	embed=user_embed(ctx,user,f"revoked lead permissions from {user.mention}")
+	embed=user_embed(ctx,ctx.author,f"revoked lead permissions from {user.mention}")
 	await respond_and_alert(ctx,embed)
 
 	set_user_is_lead(ctx,user,False)

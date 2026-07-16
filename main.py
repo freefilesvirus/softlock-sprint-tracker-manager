@@ -142,6 +142,19 @@ def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 
 	return embed
 
+def add_task_field_to_embed(embed:discord.Embed,task:tasks.SprintTask)->None:
+	task_text:str=("> "+task.description
+			+"\n"+task.priority+" priority"
+			+"\n"+task.status)
+	# add comments
+	if task.comments!="":
+		task_text+=f"\nComments: \"{task.comments}\""
+	# add blockers
+	if task.blockers!="":
+		task_text+=f"\nBlockers: \"{task.blockers}\""
+
+	embed.add_field(name="",value=task_text,inline=False)
+
 async def send_alert(ctx,embed:discord.Embed)->None:
 	alert_channel:discord.channel=await get_alert_channel(ctx)
 	await alert_channel.send(embed=embed)
@@ -285,10 +298,11 @@ async def command_changediscipline(ctx,
 	if task.discipline==discipline:
 		await fail(ctx,f"The discipline of that task is already \"{discipline}\"")
 		return
+	task.discipline=discipline
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the discipline of a task to \"{discipline}\"")
-	embed.add_field(name="",value="> "+task.description,inline=False)
+	add_task_field_to_embed(embed,task)
 	embed.color=get_element_discord_color(discipline)
 	await respond_and_alert(ctx,embed)
 
@@ -319,10 +333,11 @@ async def command_changepriority(ctx,
 	if task.priority==priority:
 		await fail(ctx,f"The priority of that task is already \"{priority}\"")
 		return
+	task.priority=priority
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the priority of a task to \"{priority}\"")
-	embed.add_field(name="",value="> "+task.description,inline=False)
+	add_task_field_to_embed(embed,task)
 	embed.color=get_element_discord_color(priority)
 	await respond_and_alert(ctx,embed)
 
@@ -354,18 +369,20 @@ async def command_assignuser(ctx,
 	if sheet_user in task.assigned_users:
 		await fail(ctx,f"{sheet_user} is already assigned to that task")
 		return
+	
+	# fix users
+	task.assigned_users.insert(0,sheet_user)
+	while len(task.assigned_users)>tasks.SHEET_ASSIGNED_USERS_COUNT:
+		task.assigned_users.pop()
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx,ctx.author,
 		f"assigned {user.mention if user!=ctx.author else 'themself'} (as {sheet_user}) to a task")
 	embed.color=get_element_discord_color(sheet_user)
-	embed.add_field(name="",value="> "+task.description,inline=False)
+	add_task_field_to_embed(embed,task)
 	await respond_and_alert(ctx,embed)
 	
 	# update task
-	task.assigned_users.insert(0,sheet_user)
-	while len(task.assigned_users)>tasks.SHEET_ASSIGNED_USERS_COUNT:
-		task.assigned_users.pop()
 	task.invalidate()
 
 @bot.slash_command(
@@ -386,16 +403,14 @@ async def command_setstatus(ctx,
 	if task.status==status:
 		await fail(ctx,f"The status of that task is already \"{status}\"")
 		return
+	task.status=status
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"set the status of a task to \"{status}\"")
-	embed.add_field(name="",value="> "+task.description,inline=False)
+	add_task_field_to_embed(embed,task)
 	embed.color=get_element_discord_color(status)
 	await respond_and_alert(ctx,embed)
-
-	# update task
-	task.status=status
-
+	
 	if status==tasks.COMPLETE_STATUS:
 		# set date complete to today
 		task.date_completed=datetime.now().strftime("%m/%d/%Y")
@@ -423,13 +438,13 @@ async def command_setblockers(ctx,
 		message="cleared the blockers of a task"
 	else:
 		message=f"set the blockers of a task to \"{blockers}\""
+	task.blockers=blockers
 	
 	embed:discord.Embed=user_embed(ctx,ctx.author,message)
-	embed.add_field(name="",value="> "+task.description,inline=False)
+	add_task_field_to_embed(embed,task)
 	await respond_and_alert(ctx,embed)
 
 	# update task
-	task.blockers=blockers
 	task.invalidate()
 
 @bot.slash_command(
@@ -453,13 +468,13 @@ async def command_setcomments(ctx,
 		message="cleared the comments of a task"
 	else:
 		message=f"set the comments of a task to \"{comments}\""
+	task.comments=comments
 	
 	embed:discord.Embed=user_embed(ctx,ctx.author,message)
-	embed.add_field(name="",value="> "+task.description,inline=False)
+	add_task_field_to_embed(embed,task)
 	await respond_and_alert(ctx,embed)
 
 	# update task
-	task.comments=comments
 	task.invalidate()
 
 @bot.slash_command(
@@ -503,7 +518,7 @@ async def command_createtask(ctx,
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"created a task")
-	embed.add_field(name="",value=f"> {task_description}",inline=False)
+	add_task_field_to_embed(embed,task)
 	embed.color=get_element_discord_color(discipline)
 	await respond_and_alert(ctx,embed)
 
@@ -548,7 +563,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks()
 	for task in sheet_tasks:
 		if sheet_user in task.assigned_users:
-			embed.add_field(name="",value="> "+task.description,inline=False)
+			add_task_field_to_embed(embed,task)
 
 	await ctx.respond(embed=embed,ephemeral=True)
 

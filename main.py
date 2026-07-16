@@ -561,9 +561,14 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 	
 	# get tasks
 	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks()
+	user_tasks:list[tasks.SprintTask]=[]
 	for task in sheet_tasks:
 		if sheet_user in task.assigned_users:
-			add_task_field_to_embed(embed,task)
+			user_tasks.append(task)
+	# sort
+	user_tasks.sort(key=tasks.SprintTask.sort)
+	for task in user_tasks:
+		add_task_field_to_embed(embed,task)
 
 	await ctx.respond(embed=embed,ephemeral=True)
 

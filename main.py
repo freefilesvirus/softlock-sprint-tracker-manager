@@ -177,7 +177,7 @@ async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
 	from the task description, finds a task from the sheet with a similar description or gives the user an interactive
 	prompt between a few
 	"""
-	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks()
+	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks(tasks.get_current_worksheet())
 
 	description=description
 
@@ -308,7 +308,7 @@ async def command_changediscipline(ctx,
 
 	# update task
 	task.discipline=discipline
-	task.invalidate()
+	task.invalidate(tasks.get_current_worksheet())
 
 @bot.slash_command(
 	name="changepriority",
@@ -343,7 +343,7 @@ async def command_changepriority(ctx,
 
 	# update task
 	task.priority=priority
-	task.invalidate()
+	task.invalidate(tasks.get_current_worksheet())
 
 @bot.slash_command(
 	name="assignuser",
@@ -383,7 +383,7 @@ async def command_assignuser(ctx,
 	await respond_and_alert(ctx,embed)
 	
 	# update task
-	task.invalidate()
+	task.invalidate(tasks.get_current_worksheet())
 
 @bot.slash_command(
 	name="setstatus",
@@ -415,7 +415,7 @@ async def command_setstatus(ctx,
 		# set date complete to today
 		task.date_completed=datetime.now().strftime("%m/%d/%Y")
 
-	task.invalidate()
+	task.invalidate(tasks.get_current_worksheet())
 
 @bot.slash_command(
 	name="setblockers",
@@ -445,7 +445,7 @@ async def command_setblockers(ctx,
 	await respond_and_alert(ctx,embed)
 
 	# update task
-	task.invalidate()
+	task.invalidate(tasks.get_current_worksheet())
 
 @bot.slash_command(
 	name="setcomments",
@@ -475,7 +475,7 @@ async def command_setcomments(ctx,
 	await respond_and_alert(ctx,embed)
 
 	# update task
-	task.invalidate()
+	task.invalidate(tasks.get_current_worksheet())
 
 @bot.slash_command(
 	name="register",
@@ -522,7 +522,7 @@ async def command_createtask(ctx,
 	embed.color=get_element_discord_color(discipline)
 	await respond_and_alert(ctx,embed)
 
-	task.invalidate()
+	task.invalidate(tasks.get_current_worksheet())
 	
 @bot.slash_command(
 	name="whois",
@@ -560,7 +560,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 	embed.description=f"{user.mention} (as {sheet_user}) is assigned to the following tasks"
 	
 	# get tasks
-	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks()
+	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks(tasks.get_current_worksheet())
 	user_tasks:list[tasks.SprintTask]=[]
 	for task in sheet_tasks:
 		if sheet_user in task.assigned_users:
@@ -586,7 +586,7 @@ async def command_organizesheet(ctx):
 	embed=user_embed(ctx,ctx.author,f"organized the sheet")
 	await respond_and_alert(ctx,embed)
 
-	tasks.organize_sheet()
+	tasks.organize_sheet(tasks.get_current_worksheet())
 
 @bot.slash_command(
 	name="closesprint",
@@ -659,6 +659,42 @@ async def command_setalertchannel(ctx):
 	set_alert_channel(ctx,ctx.channel)
 
 	await respond_and_alert(ctx,user_embed(ctx,ctx.author,f"set the alert channel to {ctx.channel.mention}"))
+
+@bot.slash_command(
+	name="sendtobacklog",
+	description="Sends a task from the current sheet to the backlog"
+)
+async def command_sendtobacklog(ctx,
+	task_description:discord.Option(str,description="The description to find the task")
+):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+
+@bot.slash_command(
+	name="restorefrombacklog",
+	description="Restores a task from the backlog to the current sheet"
+)
+async def command_restorefrombacklog(ctx,
+	task_description:discord.Option(str,description="The description to find the task")
+):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
 # endregion
 
 @bot.event

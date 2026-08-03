@@ -17,6 +17,7 @@ SHEET_ELEMENT_COLUMN:int=2
 
 SHEET_CURRENT_TITLE:str="current"
 SHEET_TEMPLATE_TITLE:str="template"
+SHEET_BACKLOG_TITLE:str="backlog"
 
 DEFAULT_STATUS="Not started"
 COMPLETE_STATUS="Complete"
@@ -85,7 +86,7 @@ class SprintTask:
 
 		return task_list
 
-	def invalidate(self)->None:
+	def invalidate(self,worksheet:sheet.gspread.worksheet)->None:
 		"""
 		ensures that the information on the google sheet is accurate to this
 
@@ -94,7 +95,6 @@ class SprintTask:
 		otherwise, itll create a new task and populate it with the information from this
 		"""
 		# look for existing task
-		worksheet=get_current_worksheet()
 		sheet_task_lists=get_sheet_task_lists(worksheet)
 		
 		task_index:int=-1
@@ -167,12 +167,15 @@ def get_element_color(element:str):
 def get_current_worksheet()->sheet.gspread.worksheet:
 	return sheet.get_worksheet(SHEET_CURRENT_TITLE)
 
+def get_backlog_worksheet()->sheet.gspread.worksheet:
+	return sheet.get_worksheet(SHEET_BACKLOG_TITLE)
+
 def get_sheet_task_lists(worksheet)->list[list[str]]:
 	"""
-	returns a list of all task lists from the current spreadsheet
+	returns a list of all task lists from a worksheet
 	"""
-	return sheet.batch_get_values_from_to(get_current_worksheet(),SHEET_FROM_ROW,SHEET_FROM_COLUMN,
-		worksheet.row_count,SHEET_TO_COLUMN)
+	return sheet.batch_get_values_from_to(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,
+			worksheet.row_count,SHEET_TO_COLUMN)
 
 def from_list(task_list:list[str])->SprintTask:
 	"""
@@ -208,11 +211,11 @@ def from_list(task_list:list[str])->SprintTask:
 
 	return task
 
-def from_sheet_description(description:str)->SprintTask:
+def from_sheet_description(description:str,worksheet:sheet.gspread.worksheet)->SprintTask:
 	"""
 	returns a task from the current spreadsheet matching the description
 	"""
-	for sheet_task_list in get_sheet_task_lists(get_current_worksheet()):
+	for sheet_task_list in get_sheet_task_lists(worksheet):
 		if sheet_task_list[SHEET_DESCRIPTION_COLUMN-SHEET_FROM_COLUMN]==description:
 			# found it
 			return from_list(sheet_task_list)
@@ -220,21 +223,21 @@ def from_sheet_description(description:str)->SprintTask:
 	# didnt find a matching task
 	return None
 
-def get_sheet_tasks()->list[SprintTask]:
+def get_sheet_tasks(worksheet:sheet.gspread.worksheet)->list[SprintTask]:
 	"""
 	returns a list of all tasks from the current spreadsheet
 	"""
 	sheet_tasks:list[SprintTask]=[]
-	for sheet_task_list in get_sheet_task_lists(get_current_worksheet()):
+	for sheet_task_list in get_sheet_task_lists(worksheet):
 		sheet_tasks.append(from_list(sheet_task_list))
 	return sheet_tasks
 
-def organize_sheet()->None:
+def organize_sheet(worksheet:sheet.gspread.worksheet)->None:
 	"""
 	reorganizes the tasks in the current worksheet
 	"""
 	# collect and organize
-	tasks=get_sheet_tasks()
+	tasks=get_sheet_tasks(worksheet)
 	tasks.sort(key=SprintTask.sort)
 	
 	# to lists
@@ -243,7 +246,6 @@ def organize_sheet()->None:
 		task_lists.append(task.get_list())
 	
 	# update
-	worksheet=get_current_worksheet()
 	sheet.batch_clear_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
 	sheet.batch_update_from(worksheet,SHEET_FROM_ROW,SHEET_FROM_COLUMN,task_lists)
 

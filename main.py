@@ -578,7 +578,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 
 @bot.slash_command(
 	name="organizesheet",
-	description="Organizes all the tasks on the sheet"
+	description="Organizes all the tasks in the current sheet"
 )
 async def command_organizesheet(ctx):
 	# check for authority
@@ -591,6 +591,22 @@ async def command_organizesheet(ctx):
 	await respond_and_alert(ctx,embed)
 
 	tasks.organize_sheet(tasks.get_current_worksheet())
+
+@bot.slash_command(
+	name="organizebacklog",
+	description="Organizes all the tasks in the backlog"
+)
+async def command_organizebacklog(ctx):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+
+	# make embed
+	embed=user_embed(ctx,ctx.author,f"organized the backlog")
+	await respond_and_alert(ctx,embed)
+
+	tasks.organize_sheet(tasks.get_backlog_worksheet())
 
 @bot.slash_command(
 	name="closesprint",

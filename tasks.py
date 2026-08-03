@@ -86,6 +86,27 @@ class SprintTask:
 
 		return task_list
 
+	def remove_from_sheet(self,worksheet:sheet.gspread.worksheet)->None:
+		"""
+		removes the task from a given worksheet
+		"""
+		# look for existing task
+		sheet_task_lists=get_sheet_task_lists(worksheet)
+		
+		task_index:int=-1
+		for i,task in enumerate(sheet_task_lists):
+			if (len(task)>=SHEET_DESCRIPTION_COLUMN-SHEET_FROM_COLUMN
+					and task[SHEET_DESCRIPTION_COLUMN-SHEET_FROM_COLUMN]==self.description):
+				task_index=i
+				break
+
+		# ensure task in worksheet
+		if task_index==-1:
+			# fail, not on worksheet
+			return
+
+		sheet.delete_rows(worksheet,task_index+SHEET_FROM_ROW)
+
 	def invalidate(self,worksheet:sheet.gspread.worksheet)->None:
 		"""
 		ensures that the information on the google sheet is accurate to this

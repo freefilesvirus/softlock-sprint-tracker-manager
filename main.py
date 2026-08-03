@@ -172,12 +172,16 @@ async def respond_and_alert(ctx,embed:discord.Embed)->None:
 		# send alert
 		await send_alert(ctx,embed)
 
-async def get_task_from_description(ctx,description:str)->tasks.SprintTask:
+async def get_task_from_description(ctx,description:str,worksheet:tasks.sheet.gspread.worksheet=None)->tasks.SprintTask:
 	"""
 	from the task description, finds a task from the sheet with a similar description or gives the user an interactive
 	prompt between a few
 	"""
-	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks(tasks.get_current_worksheet())
+	# if worksheet is null use current
+	if worksheet is None:
+		worksheet=tasks.get_current_worksheet()
+
+	sheet_tasks:list[tasks.SprintTask]=tasks.get_sheet_tasks(worksheet)
 
 	description=description
 
@@ -678,6 +682,15 @@ async def command_sendtobacklog(ctx,
 		await fail_notask(ctx)
 		return
 
+	embed=user_embed(ctx,ctx.author,f"sent a task to the backlog")
+	add_task_field_to_embed(embed,task)
+	await respond_and_alert(ctx,embed)
+
+	# add to backlog
+	task.invalidate(tasks.get_backlog_worksheet())
+	# remove from current
+	task.remove_from_sheet(tasks.get_current_worksheet())
+
 @bot.slash_command(
 	name="restorefrombacklog",
 	description="Restores a task from the backlog to the current sheet"
@@ -691,10 +704,19 @@ async def command_restorefrombacklog(ctx,
 		return
 
 	# check that task is valid
-	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description,tasks.get_backlog_worksheet())
 	if task is None:
 		await fail_notask(ctx)
 		return
+
+	embed=user_embed(ctx,ctx.author,f"restored a task from the backlog")
+	add_task_field_to_embed(embed,task)
+	await respond_and_alert(ctx,embed)
+
+	# add to current
+	task.invalidate(tasks.get_current_worksheet())
+	# remove from backlog
+	task.remove_from_sheet(tasks.get_backlog_worksheet())
 # endregion
 
 @bot.event

@@ -142,7 +142,7 @@ def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 
 	return embed
 
-def add_task_field_to_embed(embed:discord.Embed,task:tasks.SprintTask)->None:
+def add_task_field_to_embed(ctx,embed:discord.Embed,task:tasks.SprintTask)->None:
 	task_text:str=("> "+task.description
 			+"\n"+task.priority+" priority"
 			+"\n"+task.status)
@@ -152,6 +152,28 @@ def add_task_field_to_embed(embed:discord.Embed,task:tasks.SprintTask)->None:
 	# add blockers
 	if task.blockers!="":
 		task_text+=f"\nBlockers: \"{task.blockers}\""
+
+	# get users and try to turn names into discord ids
+	user_strings:list[str]=[]
+	for assigned_user in task.assigned_users:
+		user_id:int=get_discord_id(ctx,assigned_user)
+		if user_id is None:
+			# no registered id, just add text
+			user_strings.append(assigned_user)
+		else:
+			# ping format
+			user_strings.append(f"<@{user_id}>")
+	# add users
+	for i in range(len(user_strings)):
+		# special stuff
+		if i==0:
+			# add newline
+			task_text+="\n"
+		else:
+			# add comma
+			task_text+=", "
+
+		task_text+=user_strings[i]
 
 	embed.add_field(name="",value=task_text,inline=False)
 
@@ -306,7 +328,7 @@ async def command_changediscipline(ctx,
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the discipline of a task to \"{discipline}\"")
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	embed.color=get_element_discord_color(discipline)
 	await respond_and_alert(ctx,embed)
 
@@ -341,7 +363,7 @@ async def command_changepriority(ctx,
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"changed the priority of a task to \"{priority}\"")
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	embed.color=get_element_discord_color(priority)
 	await respond_and_alert(ctx,embed)
 
@@ -383,7 +405,7 @@ async def command_assignuser(ctx,
 	embed:discord.Embed=user_embed(ctx,ctx.author,
 		f"assigned {user.mention if user!=ctx.author else 'themself'} (as {sheet_user}) to a task")
 	embed.color=get_element_discord_color(sheet_user)
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	await respond_and_alert(ctx,embed)
 	
 	# update task
@@ -411,7 +433,7 @@ async def command_setstatus(ctx,
 
 	# make embed
 	embed:discord.Embed=user_embed(ctx,ctx.author,f"set the status of a task to \"{status}\"")
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	embed.color=get_element_discord_color(status)
 	await respond_and_alert(ctx,embed)
 	
@@ -445,7 +467,7 @@ async def command_setblockers(ctx,
 	task.blockers=blockers
 	
 	embed:discord.Embed=user_embed(ctx,ctx.author,message)
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	await respond_and_alert(ctx,embed)
 
 	# update task
@@ -475,7 +497,7 @@ async def command_setcomments(ctx,
 	task.comments=comments
 	
 	embed:discord.Embed=user_embed(ctx,ctx.author,message)
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	await respond_and_alert(ctx,embed)
 
 	# update task
@@ -522,7 +544,7 @@ async def command_createtask(ctx,
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"created a task")
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	embed.color=get_element_discord_color(discipline)
 	await respond_and_alert(ctx,embed)
 
@@ -572,7 +594,7 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 	# sort
 	user_tasks.sort(key=tasks.SprintTask.sort)
 	for task in user_tasks:
-		add_task_field_to_embed(embed,task)
+		add_task_field_to_embed(ctx,embed,task)
 
 	await ctx.respond(embed=embed,ephemeral=True)
 
@@ -699,7 +721,7 @@ async def command_sendtobacklog(ctx,
 		return
 
 	embed=user_embed(ctx,ctx.author,f"sent a task to the backlog")
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	await respond_and_alert(ctx,embed)
 
 	# add to backlog
@@ -726,7 +748,7 @@ async def command_restorefrombacklog(ctx,
 		return
 
 	embed=user_embed(ctx,ctx.author,f"restored a task from the backlog")
-	add_task_field_to_embed(embed,task)
+	add_task_field_to_embed(ctx,embed,task)
 	await respond_and_alert(ctx,embed)
 
 	# add to current

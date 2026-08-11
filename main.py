@@ -530,6 +530,9 @@ async def command_createtask(ctx,
 	discipline:discord.Option(str,choices=tasks.domains["disciplines"],description="The discipline of the task"),
 	priority:discord.Option(str,choices=tasks.domains["priorities"],description="The priority of the task"),
 	status:discord.Option(str,choices=tasks.domains["statuses"],default=tasks.DEFAULT_STATUS,description="The status of the task"),
+	assigned_user_1:discord.Option(discord.User,description="A user to assign to the task",required=False),
+	assigned_user_2:discord.Option(discord.User,description="A user to assign to the task",required=False),
+	assigned_user_3:discord.Option(discord.User,description="A user to assign to the task",required=False),
 ):
 	# check for authority
 	if not get_user_has_authority(ctx,ctx.author):
@@ -541,6 +544,15 @@ async def command_createtask(ctx,
 	task.discipline=discipline
 	task.priority=priority
 	task.status=status
+
+	# add users
+	for user in [assigned_user_1,assigned_user_2,assigned_user_3]:
+		if user is None:
+			continue
+
+		sheet_user:str=get_sheet_user(ctx,user)
+		if not sheet_user is None:
+			task.assigned_users.append(sheet_user)
 
 	# make embed
 	embed=user_embed(ctx,ctx.author,f"created a task")

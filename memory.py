@@ -84,6 +84,6 @@ def get_category_key(guild_id:int,category:str,value:str)->str:
 		return None
 	
 	# loop through all keys to find if any are associated with the value
-	for key,v in get_category(guild_id,category):
+	for key,v in get_category(guild_id,category).items():
 		if v==value:
 			return key

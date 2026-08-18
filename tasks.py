@@ -55,7 +55,8 @@ class SprintTask:
 				return 999999.0
 
 		# more important for the sort in descending order
-		for pair in [("disciplines",self.discipline),("priorities",self.priority),("statuses",self.status)]:
+		for pair in [("disciplines",self.discipline),("tags",self.tag),("priorities",self.priority),
+			   ("statuses",self.status)]:
 			score*=10
 			for index,element in enumerate(domains[pair[0]]):
 				if pair[1].lower().strip()==element.lower().strip():

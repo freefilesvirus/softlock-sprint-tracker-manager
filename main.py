@@ -143,9 +143,11 @@ def user_embed(ctx,discord_user:discord.user,action:str="")->discord.Embed:
 	return embed
 
 def add_task_field_to_embed(ctx,embed:discord.Embed,task:tasks.SprintTask)->None:
-	task_text:str=("> "+task.description
-			+"\n"+task.priority+" priority"
-			+"\n"+task.status)
+	task_text:str=""
+
+	task_text+="> "+task.description # description
+	task_text+="\n"+task.priority+" priority" # priority
+	task_text+="\n"+task.status # status
 	# add comments
 	if task.comments!="":
 		task_text+=f"\nComments: \"{task.comments}\""
@@ -504,6 +506,51 @@ async def command_setcomments(ctx,
 	task.invalidate(tasks.get_current_worksheet())
 
 @bot.slash_command(
+	name="settag",
+	description="Sets the tag of a task"
+)
+async def command_settag(ctx,
+	task_description:discord.Option(str,description="The description to find the task"),
+	tag:discord.Option(str,required=False,choices=tasks.domains["tags"],description="The tag to set for the task")
+):
+	# check for authority
+	if not get_user_has_authority(ctx,ctx.author):
+		await fail_noauth(ctx)
+		return
+	
+	# check that task is valid
+	task:tasks.SprintTask=await get_task_from_description(ctx,task_description)
+	if task is None:
+		await fail_notask(ctx)
+		return
+
+	if tag is None:
+		tag=""
+	# check for a change
+	if task.tag==tag:
+		if tag!="":
+			await fail(ctx,f"The tag of that task is already \"{tag}\"")
+		else:
+			await fail(ctx,"The tag of that task is already clear")
+		return
+
+	# make embed
+	message:str
+	if tag=="":
+		message="cleared the tag of a task"
+	else:
+		message=f"set the tag of a task to \"{tag}\""
+	task.tag=tag
+	
+	embed:discord.Embed=user_embed(ctx,ctx.author,message)
+	embed.color=get_element_discord_color(tag)
+	add_task_field_to_embed(ctx,embed,task)
+	await respond_and_alert(ctx,embed)
+
+	# update task
+	task.invalidate(tasks.get_current_worksheet())
+
+@bot.slash_command(
 	name="register",
 	description="Associates your account with a sheet user"
 )
@@ -529,6 +576,7 @@ async def command_createtask(ctx,
 	task_description:discord.Option(str,description="The description of the task"),
 	discipline:discord.Option(str,choices=tasks.domains["disciplines"],description="The discipline of the task"),
 	priority:discord.Option(str,choices=tasks.domains["priorities"],description="The priority of the task"),
+	tag:discord.Option(str,required=False,choices=tasks.domains["tags"],description="The tag to set for the task"),
 	status:discord.Option(str,choices=tasks.domains["statuses"],default=tasks.DEFAULT_STATUS,description="The status of the task"),
 	assigned_user_1:discord.Option(discord.User,description="A user to assign to the task",required=False),
 	assigned_user_2:discord.Option(discord.User,description="A user to assign to the task",required=False),
@@ -544,6 +592,7 @@ async def command_createtask(ctx,
 	task.discipline=discipline
 	task.priority=priority
 	task.status=status
+	task.tag=tag
 
 	# add users
 	for user in [assigned_user_1,assigned_user_2,assigned_user_3]:

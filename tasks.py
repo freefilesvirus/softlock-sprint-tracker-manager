@@ -2,15 +2,16 @@ import sheet
 
 SHEET_FROM_ROW:int=5
 SHEET_FROM_COLUMN:int=2
-SHEET_TO_COLUMN:int=11
-SHEET_DESCRIPTION_COLUMN:int=3
+SHEET_TO_COLUMN:int=12
+SHEET_DESCRIPTION_COLUMN:int=4
+SHEET_TAG_COLUMN:int=3
 SHEET_DISCIPLINE_COLUMN:int=2
-SHEET_STATUS_COLUMN:int=4
-SHEET_PRIORITY_COLUMN:int=5
-SHEET_DATE_COMPLETED_COLUMN:int=6
-SHEET_BLOCKERS_COLUMN:int=10
-SHEET_COMMENTS_COLUMN:int=11
-SHEET_ASSIGNED_USERS_COLUMN:int=7
+SHEET_STATUS_COLUMN:int=5
+SHEET_PRIORITY_COLUMN:int=6
+SHEET_DATE_COMPLETED_COLUMN:int=7
+SHEET_BLOCKERS_COLUMN:int=11
+SHEET_COMMENTS_COLUMN:int=12
+SHEET_ASSIGNED_USERS_COLUMN:int=8
 SHEET_ASSIGNED_USERS_COUNT:int=3
 
 SHEET_ELEMENT_COLUMN:int=2
@@ -33,6 +34,7 @@ class SprintTask:
 	# what is this, a spoon convention?
 	description:str=""
 	discipline:str=""
+	tag:str=""
 	status:str=DEFAULT_STATUS
 	priority:str=""
 	date_completed:str=""
@@ -71,7 +73,7 @@ class SprintTask:
 
 		# add all the one cell stuff
 		for pair in [(self.description,SHEET_DESCRIPTION_COLUMN),(self.discipline,SHEET_DISCIPLINE_COLUMN),
-			   (self.status,SHEET_STATUS_COLUMN),(self.priority,SHEET_PRIORITY_COLUMN),
+			   (self.tag,SHEET_TAG_COLUMN),(self.status,SHEET_STATUS_COLUMN),(self.priority,SHEET_PRIORITY_COLUMN),
 			   (self.date_completed,SHEET_DATE_COMPLETED_COLUMN),(self.blockers,SHEET_BLOCKERS_COLUMN),
 			   (self.comments,SHEET_COMMENTS_COLUMN)]:
 			task_list[pair[1]-SHEET_FROM_COLUMN]=pair[0]
@@ -211,6 +213,7 @@ def from_list(task_list:list[str])->SprintTask:
 	# set the one cell stuff
 	task.description=task_list[SHEET_DESCRIPTION_COLUMN-SHEET_FROM_COLUMN]
 	task.discipline=task_list[SHEET_DISCIPLINE_COLUMN-SHEET_FROM_COLUMN]
+	task.tag=task_list[SHEET_TAG_COLUMN-SHEET_FROM_COLUMN]
 	task.status=task_list[SHEET_STATUS_COLUMN-SHEET_FROM_COLUMN]
 	task.priority=task_list[SHEET_PRIORITY_COLUMN-SHEET_FROM_COLUMN]
 	task.date_completed=task_list[SHEET_DATE_COMPLETED_COLUMN-SHEET_FROM_COLUMN]
@@ -284,7 +287,7 @@ def close_sprint(archive_title:str)->None:
 	return sheet.duplicate(sheet.get_worksheet(SHEET_TEMPLATE_TITLE),0,new_sheet_name=SHEET_CURRENT_TITLE)
 
 # collect domains
-for domain in ["disciplines","statuses","priorities","users"]:
+for domain in ["disciplines","statuses","priorities","users","tags"]:
 	# collect from sheet
 	worksheet=sheet.get_worksheet(domain)
 	column_data:list[list[str]]=sheet.batch_get_values_from_to(worksheet,SHEET_FROM_ROW,SHEET_ELEMENT_COLUMN,

@@ -196,11 +196,20 @@ async def respond_and_alert(ctx,embed:discord.Embed)->None:
 		# send alert
 		await send_alert(ctx,embed)
 
+async def defer_context_response(ctx,force_ephemeral:bool=False)->None:
+	if not force_ephemeral and ctx.channel==await get_alert_channel(ctx):
+		await ctx.defer()
+	else:
+		await ctx.defer(ephemeral=True)
+
 async def get_task_from_description(ctx,description:str,worksheet:tasks.sheet.gspread.worksheet=None)->tasks.SprintTask:
 	"""
 	from the task description, finds a task from the sheet with a similar description or gives the user an interactive
 	prompt between a few
 	"""
+	# its gonna be a second
+	await defer_context_response(ctx)
+	
 	# if worksheet is null use current
 	if worksheet is None:
 		worksheet=tasks.get_current_worksheet()
@@ -222,12 +231,6 @@ async def get_task_from_description(ctx,description:str,worksheet:tasks.sheet.gs
 				if task.description==match[0]:
 					return task
 
-	# its gonna be a second
-	if ctx.channel==await get_alert_channel(ctx):
-		await ctx.defer()
-	else:
-		await ctx.defer(ephemeral=True)
-	
 	# offer similar tasks
 	embed=user_embed(ctx,ctx.author)
 	embed.add_field(name="",value="Invalid task! Did you mean one of the following?",inline=False)
@@ -641,6 +644,9 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 	if sheet_user is None:
 		await fail_notregistered(ctx,user)
 		return
+
+	# now that the fails have passed this can take a long time
+	await defer_context_response(ctx, True)
 
 	embed=discord.Embed()
 	embed.color=get_element_discord_color(sheet_user)

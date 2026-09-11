@@ -634,7 +634,8 @@ async def command_assignuser(ctx,user:discord.Option(discord.User,description="T
 	name="getusertasks",
 	description="Gets all tasks assigned to a specific user"
 )
-async def command_getusertasks(ctx,user:discord.Option(discord.User,description="The user to check",required=False)):
+async def command_getusertasks(ctx,user:discord.Option(discord.User,description="The user to check",required=False),
+		hide_complete:discord.Option(bool,description="Whether to hide completed tasks",default=True)):
 	# set user to author if unspecified
 	if user is None:
 		user=ctx.author
@@ -661,6 +662,10 @@ async def command_getusertasks(ctx,user:discord.Option(discord.User,description=
 	# sort
 	user_tasks.sort(key=tasks.SprintTask.sort)
 	for task in user_tasks:
+		# filter out complete
+		if hide_complete and task.status==tasks.COMPLETE_STATUS:
+			continue
+		
 		add_task_field_to_embed(ctx,embed,task)
 
 	await ctx.respond(embed=embed,ephemeral=True)
